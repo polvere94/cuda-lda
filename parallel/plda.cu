@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <cuda.h>
+#include "cublas_v2.h"
 
 #define BDMX 16
 #define BDMY 16
@@ -19,6 +21,15 @@ typedef struct Matrix_{
 } Matrix;
 
 /*
+ * kernel: somma di matrici
+ */
+__global__ void add_matrix(float* in_a, float* in_b, float* out,int n, int m) {
+	int idx = blockDim.x * blockIdx.x + threadIdx.x;
+	if ((idx < n*m))
+		out[idx] = in_a[idx] + in_b[idx];
+}
+
+/*
  * kernel: somma dei vettori
  */
 __global__ void add_vect(float* in_a, float* in_b, float* out, int v_size, int n_matrix) {
@@ -30,24 +41,56 @@ __global__ void add_vect(float* in_a, float* in_b, float* out, int v_size, int n
 /*
  * kernel: differenza dei vettori
  */
+__global__ void div_matr_scal(float* in_a, float scalar, float* out, int n, int m) {
+	int idx = blockDim.x * blockIdx.x + threadIdx.x;
+	if (idx < n*m)
+		out[idx] = in_a[idx] / scalar;
+}
+/*
+ * kernel: differenza dei vettori
+ */
 __global__ void diff_vect(float* in_a, float* in_b, float* out, int v_size, int n_matrix) {
 	int idx = blockDim.x * blockIdx.x + threadIdx.x;
 	if (idx < v_size)
 		out[idx] = in_a[idx] - in_b[idx];
 }
 
+/*
+ * kernel: differenza tra vettore e matrice
+ */
+__global__ void diff_matr_vect( float* in_matr, float* in_vect, float* out_matr, int n, int m) {
+	int idx = blockDim.x * blockIdx.x + threadIdx.x;
+	if (idx < n*m)
+		out_matr[idx] = in_matr[idx] - in_vect[idx%m];
+}
+
 // n e m dimensione matrice output
-__global__ void matrix_prod(float* in_a, float* in_b, float* out, int n, int m){
+__global__ void matrix_prod(float* in_a, float* in_b, float* out, int n, int m,int p){
 	int row = blockIdx.y * blockDim.y + threadIdx.y;
 	int col = blockIdx.x * blockDim.x + threadIdx.x;
-	int i = 0;
-	float val = 0;
 	if((row < n) && (col < m)){
-		val = 0;
-		for(i=0; i<m; i++){
-			val += in_a[row * m + i] * in_b[i * m + col];
+		int i = 0;	
+		float val = 0;
+		for(i=0; i<p; i++){
+			val +=  in_a[(row * p) + i] * in_b[(i * m) + col];
 		}
-		out[row * m + col] = val;
+		out[(row * m) + col] = val;
+		
+	}
+}
+
+//Prodotto vettore colonna per vettore riga
+// n e m dimensione matrice output
+__global__ void vector_prod(float* in_a, float* in_b, float* out, int n, int m){
+	int row = blockIdx.y * blockDim.y + threadIdx.y;
+	int col = blockIdx.x * blockDim.x + threadIdx.x;
+	if((row < n) && (col < m)){
+		int i = 0;	
+		float val = 0;
+		for(i=0; i<m; i++){
+			val = in_a[row] * in_b[i];
+			out[(m*row)+i] = val;
+		}		
 	}
 }
 
@@ -73,35 +116,16 @@ __global__ void matrix_mean(float* in, float* out, int in_row, int in_col){
 	}
 }
 
+// case 0 transpose kernel: read in rows and write in columns
+__global__ void transposeNaiveRow(float* in, float* out, int ny, int nx) {
+	int ix = blockDim.x * blockIdx.x + threadIdx.x;
+	int iy = blockDim.y * blockIdx.y + threadIdx.y;
 
-__global__ void transposeSmem(float* in, float* out, int n_row, int n_col){
-	__shared__ float tile[BDMY][BDMX];
-
-	unsigned int row = blockDim.y * blockIdx.y + threadIdx.y;
-	unsigned int col = blockDim.x * blockIdx.x + threadIdx.x;
-
-	unsigned int offset =  INDEX(row, col, n_col);
-
-	if(row < n_row && col < n_col){
-		tile[threadIdx.y][threadIdx.x] = in[offset];
-		printf("%f\n",tile[threadIdx.y][threadIdx.x] );
+	if ((ix < nx) && (iy < ny)) {
+		out[(ix*ny) + iy] = in[(iy*nx) + ix];
 	}
-	__syncthreads();
-
-	unsigned int bidx, irow, icol;
-
-	bidx = threadIdx.y * blockDim.x + threadIdx.x;
-	irow = bidx / blockDim.y;
-	icol = bidx % blockDim.y;
-
-	col = blockIdx.y * blockDim.y + icol;
-	row = blockIdx.x * blockDim.x + irow;
-	printf("Trasposta\n");
-	unsigned int transposed_offset = INDEX(row,col, n_row);
-	if(row < n_col && col < n_row)
-		out[transposed_offset] = tile[icol][irow];
-
 }
+
 
 
 void read_data_file(Matrix* matrix, int n_matrix, int n_lines){
@@ -136,6 +160,13 @@ void read_data_file(Matrix* matrix, int n_matrix, int n_lines){
 		   n_%	number of %
 */
 int main(void){
+
+	cublasHandle_t handle;
+	cublasCreate(&handle);
+	int version;
+	cublasGetVersion(handle, &version);
+	printf("\nUsing CUBLAS Version: %d\n", version);
+
 	//Fase 1) calcolo la media delle matrici
 	int i,j;
 
@@ -210,7 +241,6 @@ int main(void){
 		add_vect<<<1,n_feature>>>(d_tmeans, d_means[i], d_tmeans, 1*n_feature*sizeof(float), n_matrix);
 	}
 
-
 	cudaMemcpy(t_mean, d_tmeans, 1*n_feature*sizeof(float), cudaMemcpyDeviceToHost);
 	
 	cudaDeviceSynchronize();
@@ -219,6 +249,8 @@ int main(void){
 		t_mean[i]=t_mean[i] / n_matrix;
 	}
 
+	cudaMemcpy(d_tmeans, t_mean, 1*n_feature*sizeof(float), cudaMemcpyHostToDevice);
+	
 
 	printf("\nMEDIA TOTALE\n");
 	for(j=0; j<n_feature; j++){
@@ -236,20 +268,149 @@ int main(void){
 	
 				Calcolo Between-class scatter matrix
 	*/
+	dim3 thread_block(1,n_feature);
+	dim3 blocks_grid(1, 1);
 
 
-	cudaMalloc((void**)&d_tmeans, 1*n_feature*sizeof(float));
+	float* h_sb_temp = (float*) malloc(1*n_feature*sizeof(float));
+	float** d_temp1;
+	d_temp1 = (float**)malloc(n_matrix*sizeof(float*)); 
 
-	float* d_means_v;
+	//float* d_sb_temp;
+	float** d_sb_temp;
+	d_sb_temp = (float**)malloc(n_matrix*sizeof(float*)); 
+	
+	//Inizializzazione
+	for(i=0;i<n_matrix;i++){
+		cudaMalloc((void**)&d_temp1[i], 1*n_feature*sizeof(float));
+		cudaMalloc((void**)&d_sb_temp[i], n_feature*n_feature*sizeof(float));
+	}
+	//cudaMalloc((void**)&d_temp1, 1*n_feature*sizeof(float));
+	//cudaMalloc((void**)&d_sb_temp, n_feature*n_feature*sizeof(float));
+	
 	for(int i=0; i<n_matrix; i++){
 		//Fare differenza tra media locale e media globale (sono due vettori)
-		diff_vect<<<1, n_feature>>>(d_means[i], d_tmeans,OUT!!!, 1, n_feature);
+		diff_vect<<<1, n_feature>>>(d_means[i], d_tmeans, d_temp1[i], n_feature, 1);
 		//Devo trasporre la matrice risultante.
-
+		vector_prod<<<blocks_grid, thread_block>>>(d_temp1[i], d_temp1[i], d_sb_temp[i], n_feature, n_feature);
 		//Devo motliplicare le due matrici UNO x DUE
 	}
+	cudaMemcpy(h_sb_temp, d_sb_temp[1], n_feature*n_feature*sizeof(float), cudaMemcpyDeviceToHost);
+	
+	cudaDeviceSynchronize();
+	//Divido per il numero di classi
 
+	//matrice n_feature X n_feature
+	for(int j=0; j<n_feature; j++){
+		for(int i=0; i<n_feature; i++){
+			printf("%.3f ",h_sb_temp[(j*n_feature)+i]);
+		}
+		printf("\n");
+	}
+	printf("\n\n\n");
 	//SOMMO TUTTE LE MATRICI USCENTI DALLE MOLTIPLICAZIONE ED OTTENGO SB
+	float* d_sb;
+	float* h_sb = (float*)malloc(n_feature*n_feature*sizeof(float));
+	cudaMalloc((void**)&d_sb,n_feature*n_feature*sizeof(float));
+	cudaMemset(d_sb, 0, n_feature*n_feature*sizeof(float)); 
+
+	dim3 thread_block2(n_feature*n_feature,1);
+	dim3 blocks_grid2(1, 1);
+	for(int i=0; i<n_matrix; i++){
+		add_matrix<<<blocks_grid2, thread_block2>>>(d_sb, d_sb_temp[i], d_sb, n_feature, n_feature);
+	}
+
+	cudaMemcpy(h_sb, d_sb, n_feature*n_feature*sizeof(float), cudaMemcpyDeviceToHost);
+	
+	cudaDeviceSynchronize();
+
+	// Matrice n_feature X n_feature
+	for(int j=0; j<n_feature; j++){
+		for(int i=0; i<n_feature; i++){
+			printf("%.3f ",h_sb[(j*n_feature)+i]);
+		}
+		printf("\n");
+	}
+
+	for(int i = 0;i<n_matrix;i++){
+		cudaFree(&d_sb_temp[i]);
+	}
+	free(d_sb_temp);
+	
+
+	/********************
+	variabile d_sb contiene Between-scatter matrix
+	********************/
+
+
+	/********************
+	Calcolo della Within-scatter matrix
+
+	((setosa - m_s'))'*((setosa - m_s')))./50
+	sw = n.*( c_s + c_vi + c_ve); Somma di covarianze
+
+	********************/
+
+	//Calcolo covarianza
+	float** d_temp_sw;
+	d_temp_sw = (float**)malloc(n_matrix*sizeof(float*));
+	for(i=0;i<n_matrix;i++)
+		cudaMalloc((void**)&d_temp_sw[i], n_lines*n_feature*sizeof(float));
+	//Differenza tra la la matrice ed il vettore, riga per riga
+	for(int i=0;i<n_matrix; i++){
+		diff_matr_vect<<<1, n_lines * n_feature>>>(d_data[i], d_means[i], d_temp_sw[i], n_lines, n_feature);
+	}
+
+	float** d_temp_sw2;
+	float** d_temp_sw_t;
+	d_temp_sw2 = (float**)malloc(n_matrix*sizeof(float*));
+	for(i=0;i<n_matrix;i++)
+		cudaMalloc((void**)&d_temp_sw2[i], n_feature*n_feature*sizeof(float));
+
+	d_temp_sw_t = (float**)malloc(n_matrix*sizeof(float*));
+	for(i=0; i<n_matrix; i++)
+		cudaMalloc((void**)&d_temp_sw_t[i], n_feature*n_lines*sizeof(float));
+
+	dim3 bg(1,1);
+	dim3 th1(n_feature,n_lines);
+	dim3 th2(n_feature,n_feature);
+	for(int i=0;i<n_matrix; i++){
+		transposeNaiveRow<<<bg,th1>>>(d_temp_sw[i], d_temp_sw_t[i], n_lines, n_feature);
+		printf("QUI\n");
+		matrix_prod<<<bg,th2>>>(d_temp_sw_t[i], d_temp_sw[i], d_temp_sw2[i], n_feature, n_feature,n_lines);
+		//add_matrix<<<blocks_grid2, thread_block2>>>(d_sb, d_sb_temp[i], d_sb, n_feature, n_feature);
+		//vector_prod<<<blocks_grid, thread_block>>>(d_temp1[i], d_temp1[i], d_sb_temp[i], n_feature, n_feature)
+		div_matr_scal<<<bg,n_feature*n_feature>>>(d_temp_sw2[i], n_lines-1, d_temp_sw2[i], n_feature, n_feature);
+	}
+	cudaDeviceSynchronize();
+	
+	float* d_sw;
+	cudaMalloc((void**)&d_sw,n_feature*n_feature*sizeof(float));
+	cudaMemset(d_sw,0,n_feature*n_feature*sizeof(float));
+	
+	for(int i=0; i<n_matrix; i++){
+		add_matrix<<<1, n_feature*n_feature>>>(d_sw, d_temp_sw2[i], d_sw, n_feature, n_feature);
+	}
+
+	float* h_temp_sw = (float*)malloc(n_feature*n_feature*sizeof(float));
+	cudaMemcpy(h_temp_sw, d_sw, n_feature*n_feature*sizeof(float), cudaMemcpyDeviceToHost);
+	
+	
+	//Divido per il numero di classi
+
+	// Matrice n_feature X n_feature
+	printf("\n\n");
+	for(int j=0; j<n_feature; j++){
+		for(int i=0; i<n_feature; i++){
+			printf("%.4f ",h_temp_sw[(j*n_feature)+i]);
+		}
+		printf("\n");
+	}
+
+	/***********************
+		Ho trovato SW!!!
+		Ora devo calcolare la matrice inversa di SW e poi usare SVD per trovare gli autovalori e autovettori associati
+	************************/
 
 
 	return 0;
