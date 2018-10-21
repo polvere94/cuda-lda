@@ -1,3 +1,11 @@
+/*
+Compile instruction
+-> nvcc -arch=sm_20 .\plda.cu  -lcublas -lcusolver
+
+@author: Francesco Polvere
+@email: francesco.polvere@studenti.unimi.it
+*/
+
 #include <stdio.h>
 #include <stdlib.h> 
 #include <cuda.h>
@@ -39,7 +47,7 @@ typedef struct Matrix_{
     float* mean;
 } Matrix;
 
-void plot(Matrix* matrix, int n_matrix, int n_row, int n_col, int k,float point_x, float point_y);
+void plot(Matrix* matrix, int n_matrix, int n_row, int n_col);
 void invert(float* src, float* dst, int n);
 void invert_device(float* src_d, float* dst_d, int n);
 /*
@@ -190,7 +198,7 @@ int main(void){
 	printf("\nUsing CUBLAS Version: %d\n", version);
 
 	//Fase 1) calcolo la media delle matrici
-	int i,j;
+	int i;
 
 
 	/* Lettura matrici dai file*/
@@ -204,9 +212,6 @@ int main(void){
 	for(int i=0; i<n_matrix; i++){
 		cudaMallocHost((void**)&matrix[i].data, n_feature*n_lines*sizeof(float));
 		cudaMallocHost((void**)&matrix[i].mean, 1*n_feature*sizeof(float));
-
-		/*matrix[i].data = (float*)malloc(n_lines*n_feature*sizeof(float));
-		matrix[i].mean = (float*) malloc(1*n_feature*sizeof(float));*/
 	}
 
 	read_data_file(matrix, n_matrix, n_lines);
@@ -275,21 +280,16 @@ int main(void){
 	
 
 	print_matrix(t_mean, 1, n_feature, "Media totale");
-	/*for(j=0; j<n_feature; j++){
-		printf("%.4f ", t_mean[j]);
-	}
-	printf("\n");*/
 	
 
-
-	/*Calcolo di Sb (Between class Matrix)
+	/************************************
+	Calcolo di Sb (Between class Matrix)
 	 per ogni classe calcolare:
 	
 	SB(i) = Ns .* (m_s - m)*(m_s - m)';
 	SB = SBi + SB(i+1)+ ... + SB(n-1)
 	
-				Calcolo Between-class scatter matrix
-	*/
+	**************************************/
 	dim3 thread_block(1,n_feature);
 	dim3 blocks_grid(1, 1);
 
@@ -298,7 +298,6 @@ int main(void){
 	float** d_temp1;
 	d_temp1 = (float**)malloc(n_matrix*sizeof(float*)); 
 
-	//float* d_sb_temp;
 	float** d_sb_temp;
 	d_sb_temp = (float**)malloc(n_matrix*sizeof(float*)); 
 	
@@ -338,6 +337,7 @@ int main(void){
 	for(int i = 0;i<n_matrix;i++){
 		cudaFree(&d_sb_temp[i]);
 	}
+
 	free(d_sb_temp);
 
 	
@@ -345,7 +345,7 @@ int main(void){
 
 		
 	//TODO: liberare memoria delle operazioni di SB
-	
+
 
 	/********************
 	variabile d_sb contiene Between-scatter matrix
@@ -503,18 +503,70 @@ int main(void){
 
 
     // IMPORTANTE: il risultato è trasposto!  VET' * VAL * inv(VET')
+    float* h_v = (float*)malloc(m*lda*sizeof(float));
+
      printf("\n\nAutovettori \n");
      printf("[");
     for(int i = 0 ; i < m ; i++){
-    	for(int j=0; j<lda; j++)
-        	printf("%.04f ", V[j*m+i]);
+    	for(int j=0; j<lda; j++){
+    		h_v[i*lda+j] = V[j*m+i];
+        	printf("%.04f ", h_v[i*lda+j]);
+    	}
         printf(";\n");
     }
     printf("]");
 
     //print_matrix(V, lda, m, "Autovettori");
 
-    plot(matrix,n_matrix, n_lines, n_feature, 2, V[3], V[3*m]);
+    //Devo moltiplicare i dati X gli n_matrix-1 autovettori non nulli (i maggiori)
+    float* h_eigenvectors = (float*)malloc(m*(n_matrix-1)*sizeof(float));
+
+    // 4x4
+   	int rows = m;
+   	int cols = lda;
+    for(int i=0; i<rows; i++){
+    	int h=0;
+    	for(int j=0; j<2; j++){
+    		h_eigenvectors[i*(n_matrix-1)+h] = h_v[i*cols+j];
+    		h++;
+    	}    	
+    }
+
+    print_matrix(h_eigenvectors,rows,n_matrix-1,"Autovavettori considerati");
+    float* d_eigv;
+
+    cudaMalloc((void**)&d_eigv,rows*(n_matrix-1)*sizeof(float));
+    cudaMemcpy(d_eigv,h_eigenvectors,rows*(n_matrix-1)*sizeof(float),cudaMemcpyHostToDevice);
+
+	Matrix* new_matrix = (Matrix*) malloc(n_matrix*sizeof(Matrix));
+	for(int i=0; i<n_matrix; i++){
+		new_matrix[i].data = (float*)malloc(n_lines*(n_matrix-1)*sizeof(float));
+		new_matrix[i].mean = (float*)malloc( 1*(n_matrix-1)*sizeof(float));
+	}
+    float** d_new_data = (float**)malloc(n_matrix*sizeof(float*));
+	for(i=0; i<n_matrix; i++)
+		cudaMalloc((void**)&d_new_data[i], n_lines*(n_matrix-1)*sizeof(float));
+
+	dim3 thh(n_matrix-1,n_lines);
+	for(int i=0;i<n_matrix; i++){
+		matrix_prod<<<1,thh>>>(matrix[i].data, d_eigv, d_new_data[i], n_lines, n_matrix-1, n_feature);
+	}
+	cudaDeviceSynchronize();
+
+	for(int i=0; i<n_matrix; i++){
+		//print_matrix(matrix[i].data,n_lines,n_matrix-1,"Vecchia matrice");
+		cudaMemcpy(new_matrix[i].data,d_new_data[i],n_lines*(n_matrix-1)*sizeof(float),cudaMemcpyDeviceToHost);
+		print_matrix(new_matrix[i].data,n_lines,n_matrix-1,"Nuova matrice");
+	}
+
+	 plot(matrix,n_matrix, 4, 2);
+
+
+	// plot(new_matrix,n_matrix, n_lines, n_matrix-1);
+
+	 //, V[3], V[3*m]
+    plot(new_matrix,n_matrix, n_lines, n_matrix-1);
+
 
 	return 0;
 }
@@ -582,11 +634,11 @@ void invert_device(float* src_d, float* dst_d, int n){
     cudaFree(P), cudaFree(INFO), cublasDestroy_v2(handle);
 }
 
-void plot(Matrix* matrix, int n_matrix, int n_row, int n_col, int k,float point_x, float point_y){
+void plot(Matrix* matrix, int n_matrix, int n_row, int n_col){
 	int i,h, j = 0;
 	#define NUM_COMMANDS 2
 	char * commandsForGnuplot[] = {"set title 'LDA - Fisher Iris'", 
-	"plot 'data/data.temp' u 1:2:3  title 'dati'  pointtype 5 linecolor  palette, 'data/line.temp' u 1:2  title 'proiezione' with line"};
+	"plot 'data/data.temp' u 1:2:3  title 'dati'  pointtype 5 linecolor  palette"};
 	
 	FILE * gnuplotPipe = _popen ("gnuplot -persistent", "w");
 
@@ -600,7 +652,7 @@ void plot(Matrix* matrix, int n_matrix, int n_row, int n_col, int k,float point_
 			fprintf(temp, "%d \n",h);
 		}
 	}
-
+/*
 	FILE * temp_line = fopen("data/line.temp", "w");
 
 	for(int i=-10;i<=25;i++){
@@ -610,7 +662,7 @@ void plot(Matrix* matrix, int n_matrix, int n_row, int n_col, int k,float point_
 		fprintf(temp_line,"\n");
 	}
 	 
-			
+			*/
 
 	for (i=0; i < NUM_COMMANDS; i++){
 		fprintf(gnuplotPipe, "%s \n", commandsForGnuplot[i]);

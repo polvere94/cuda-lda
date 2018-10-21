@@ -79,7 +79,15 @@ int main(void){
 	  			break;
 	  		h++;
 		}
+/*
 
+		M[i].data[0][0]=1+i;
+		M[i].data[0][1]=2;
+		M[i].data[1][0]=3;
+		M[i].data[1][1]=4+i;
+		M[i].data[2][0]=1;
+		M[i].data[2][1]=1;
+*/
 		print_matrix(M[i].data,n_row, n_col);
 
 		//Calcola la media della matrice i-esima
@@ -124,8 +132,7 @@ int main(void){
 		printf("Prodotto tra:");
 		print_matrix(v_transpose, n_col, 1);
 		print_matrix(SBc, 1, n_col);
-
-		//Fai il prodotto della trasposta della riga per la riga stessa
+		
 		prod(v_transpose, SBc, n_col, unit, unit ,n_col, res2);
 		sum_matrix(accumulatore_sb, res2, n_col, n_col);
 	}
@@ -231,7 +238,7 @@ int main(void){
 		printf("%f ",v[i][i_max]);
 	}
 
-	plot(M, N_MATRIX, n_row, n_col,2,v[0][i_max],v[1][i_max]);
+	 plot(M, N_MATRIX, n_row, n_col,2,v[0][i_max],v[1][i_max]);
 
 	  for(int i =0; i<N_MATRIX; i++){
 		free(M[i].data);
@@ -460,7 +467,7 @@ void plot(Matrix* matrix, int n_matrix, int n_row, int n_col, int k,float point_
 
 	FILE * temp = fopen("data/data.temp", "w");
 
-	for(h=0; h<n_matrix; h++){
+	for(h=0; h<N_MATRIX; h++){
 		for(i=0; i < n_row;i++){
 			for(j=0;j<2;j++){
 				fprintf(temp, "%lf ", matrix[h].data[i][j]); 

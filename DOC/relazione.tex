@@ -1,0 +1,35 @@
+\documentclass[twocolumn]{article}
+\usepackage{lipsum}% http://ctan.org/pkg/lipsum
+\begin{document}
+	\title{Linear discriminant analisys con CUDA C}
+	\author{Francesco~Polvere
+		\thanks{F. Polvere, Corso di GPU computing,  A/A 2017-2018, Universit\'a degli studi di Milano,
+			via Celoria 28, Milano, Italia \protect\\
+			% note need leading \protect in front of \\ to get a newline within \thanks as
+			% \\ is fragile and will error, could use \hfil\break instead.
+			E-mail: francesco.polvere@studenti.unimi.it}%
+	}
+	\maketitle
+	\begin{abstract}
+		%\boldmath
+		In questo documento viene presentata una implementazione dell'algoritmo di linear discriminant analisys tramite computazioni l'utilizzo della GPU sulla piattaforma CUDA. 
+		L'implementazione parallela vien confrontata con l'implementazione classica in C, misurando le caratteristiche principali.
+	
+	
+\end{abstract}
+\section{Introduction}
+Da una analisi attenta del metodo di LDA, si può notare la presenza di numerose operazioni che presentano un alto grado di parallelizzabilità
+\section{Analisi dello stato dell'arte}
+\lipsum[1-2]
+\section{Modello teorico}
+\lipsum[1-5]
+\section{Simulazione ed esperimenti}
+Sono stati sviluppati due algoritmi. Quello sequenziale e quello parallelo.
+\subsection{Dataset}
+Per il benchmark \'e stato utilizzato il dataset Iris, introdotto da Ronald Fisher. Il dataset consiste in tre classi, ognuna delle quali rappresenta una specie di pianta, con un numero di istanze di 50 per ogni classe, per un totale di 150 istanze.
+Le variabili considerate sono quattro e consistono nella lunghezza e larghezza del sepalo e del petalo.
+\section{Risultati ottenuti}
+
+\section{Conclusioni}
+\lipsum[1-2]
+\end{document}
