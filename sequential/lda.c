@@ -360,7 +360,7 @@ float determinant(float **a,float size){
 	                       n++;
 	                   	else{
 	                    	n=0;
-	                    m++;
+	                    	m++;
 	                    }
 	                }
 	            }

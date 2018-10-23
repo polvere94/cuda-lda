@@ -22,13 +22,37 @@ Da una analisi attenta del metodo di LDA, si può notare la presenza di numerose
 \section{Analisi dello stato dell'arte}
 \lipsum[1-2]
 \section{Modello teorico}
-\lipsum[1-5]
+La LDA \'e un metodo utilizzato per trovare una combinazione lineare di features che caratterizzato o separano due o più classi di oggetti o eventi. Il combinazione risultante può essere utilizzata  come classificatore lineare o ancor prima della classificazione, come operazione di riduzione di dimensionalità.
+\subsection{LDA Multiclasse}
+Supponiamo di avere \(n\) classi. La Within-scatter matrix è calcolata come:
+
+\[Sw = \sum_{i=1}^{C}\sum_{x app Ci }(x-x_{i})(x-x_{i})'\]
+
+Mentre la between-scatter matrix è calcolata come:
+\[Sb = \sum_{i=1}^{n}m_{i}(\overline{x}_{i}-\overline{x})(\overline{x}_{i}-\overline{x})'\]
+
+Dove \(\overline{x}\) \'e la media totale di tutte le classi, \(m_{i}\) \'e il numero di dati di training per ogni classe.\\
+Dopo aver ottenuto \(Sb\) e \(Sw\), vogliamo trovare l'equazione lineare che massimizza l'equazione in figura.
+
+\[J(W) = \frac{|W^{T} S_{b}  W|}{|W^{T} S_{w} W|}\]
+
+Si può dimostrare che la trasformazione W può essere ottenuta risolvendo un problema sugli autovalori:
+\[S_{b}W = \lambda S_{w}W\]
+ 
 \section{Simulazione ed esperimenti}
 Sono stati sviluppati due algoritmi. Quello sequenziale e quello parallelo.
 \subsection{Dataset}
 Per il benchmark \'e stato utilizzato il dataset Iris, introdotto da Ronald Fisher. Il dataset consiste in tre classi, ognuna delle quali rappresenta una specie di pianta, con un numero di istanze di 50 per ogni classe, per un totale di 150 istanze.
 Le variabili considerate sono quattro e consistono nella lunghezza e larghezza del sepalo e del petalo.
 \section{Risultati ottenuti}
+Il codice è stato eseguito su un computer con le seguenti caratteristiche:
+\begin{itemize}
+	\item GPU: NVIDIA GeForce 610M, compute capability  2.1, architettura FERMI (2.1) con 48 Cores/SM.
+	\item CPU: Intel(R) Core(TM) i7-3630QM CPU @ 2.40GHz, 2401 Mhz, 4 core, 8 processori logici
+\end{itemize}
+ 
+
+
 
 \section{Conclusioni}
 \lipsum[1-2]
