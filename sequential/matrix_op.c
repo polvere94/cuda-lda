@@ -1,3 +1,8 @@
+#include "matrix_op.h"
+typedef struct Matrix_{
+    float* data;
+    float* mean;
+} Matrix;
 
 /* Metodo della matrice dei cofattori
 Calcolo dei cofattori della matrice */
@@ -197,3 +202,80 @@ void print_matrix(float* a, int row, int col){
 	}
 	printf("\n\n");
 }
+
+int find_max(float* vector, int size){
+	int max = 0,i;
+	int index = 0;
+	for(i=0;i<size;i++){
+		if(vector[i]>=max){
+			index=i;
+			max=vector[i];
+		}
+	}
+	return index;
+}
+
+float** from_linear_to_double(float* a, int n_row, int n_col){
+	int i,j;
+	float** res;
+	res = (float**)malloc(n_row*sizeof(float*));
+	for(i=0; i<n_row; i++)
+		res[i]=(float*)malloc(n_col*sizeof(float*));
+	
+	for(i=0; i<n_row; i++)
+		for(j=0; j<n_col; j++)
+			res[i][j] = a[(i*n_col)+j];
+	return res;
+}
+
+float* from_double_to_linear(float** a, int n_row, int n_col){
+	int i,j;
+	float* res;
+	res = (float*)malloc(n_row*n_col*sizeof(float));
+	for(i=0; i<n_row; i++)
+		for(j=0; j<n_col; j++)
+			res[(i*n_col)+j] = a[i][j];
+	return res;
+}
+
+
+float LDeterminant(float* a, int size){
+	int i;
+	float d;
+	float **temp;
+	temp = from_linear_to_double(a,size,size);
+	d = determinant(temp, size);
+	for(i=0;i<size;i++)
+		free(temp[i]);
+	free(temp);
+	return d;
+}
+
+float* LCofactor(float* a, int size){
+	int i;
+	float** temp;
+	temp = from_linear_to_double(a,size,size);
+	float** cof =  cofactor(temp,size);
+	float* res = from_double_to_linear(cof,size,size);
+	for(i=0;i<size;i++){
+		free(cof[i]);
+		free(temp[i]);
+	}
+	free(temp);
+	free(cof);
+	return res;
+}
+
+void Lsvd(float* a, int size, float* w, float* v){
+
+	float** temp_v = from_linear_to_double(v,size,size);
+	
+
+	float **temp_invsw_by_sb = from_linear_to_double(a,size,size);
+	dsvd(temp_invsw_by_sb, size, size, w, temp_v);
+	
+	free(v);
+	v = from_double_to_linear(temp_v,size,size);
+}
+
+

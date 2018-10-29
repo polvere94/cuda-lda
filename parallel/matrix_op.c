@@ -171,12 +171,12 @@ void diff_matrix_vector(float *vector, float *vector2,int n_row, int n_col, floa
 void prod(float* first, float* second, int row1, int row2, int col1, int col2, float* res){
 	int c,d,k= 0;
 	float sum = 0;
-	for (c = 0; c < row1; c++) {
-    	for (d = 0; d < col2; d++) {
-	        for (k = 0; k < row2; k++) {
-	          sum = sum + first[c*col1+k]*second[k*col2+d];
+	for (c = 0; c<row1; c++) {
+    	for (d = 0; d<col2; d++) {
+	        for (k = 0; k<row2; k++) {
+	          sum = sum + first[(c*col1)+k]*second[(k*col2)+d];
 	        }
- 			res[c*col2+d] = sum;
+ 			res[(c*col2)+d] = sum;
 	        sum = 0;
       }
     }

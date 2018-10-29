@@ -94,6 +94,7 @@ __global__ void diff_matr_vect( float* in_matr, float* in_vect, float* out_matr,
 		out_matr[idx] = in_matr[idx] - in_vect[idx%m];
 }
 
+#define IDX(i,j,n) (i*n+j)
 // n e m dimensione matrice output
 __global__ void matrix_prod(float* in_a, float* in_b, float* out, int n, int m,int p){
 	int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -146,6 +147,31 @@ __global__ void matrix_mean(float* in, float* out, int in_row, int in_col){
 	}
 }
 
+/*
+	Calcola il vettore media di una matrice rispetto alle colonne
+	matrix_mean: in   vettore in input
+				 out  vettore di output
+				 in_row   numero righe della matrice di input
+				 in_col  numero colonne della matrice di input (=colonne matrice output)
+
+*/
+__global__ void between_scatter_matrix(float* in, float* out, int in_row, int in_col){
+	int col = blockIdx.x * blockDim.x + threadIdx.x;
+	int i = 0;
+	float val = 0;
+	if((col < in_col)){
+		val = 0;
+		for(i=0; i<in_row; i++){
+			val += in[i * in_col + col];
+		}
+		out[col] = val/in_row;
+	}
+
+}
+
+
+
+
 // case 0 transpose kernel: read in rows and write in columns
 __global__ void transposeNaiveRow(float* in, float* out, int ny, int nx) {
 	int ix = blockDim.x * blockIdx.x + threadIdx.x;
@@ -156,6 +182,48 @@ __global__ void transposeNaiveRow(float* in, float* out, int ny, int nx) {
 	}
 }
 
+
+__global__ void mat_prod_shared(float* A, float* B, float* C) {
+	// indexes
+	int row = blockIdx.y * blockDim.y + threadIdx.y;
+	int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+	// block shared memory
+	__shared__ float A_s[BLOCK_SIZE][BLOCK_SIZE];
+	__shared__ float B_s[BLOCK_SIZE][BLOCK_SIZE];
+
+	// loop over blocks from block row of matrix A and block column of matrix B
+	float sum = 0.0;
+	int numBlocks = (P + BLOCK_SIZE - 1) / BLOCK_SIZE;
+	for (int m = 0; m < numBlocks; m++) {
+
+		// copy block from matrix to shared memory
+		int c = m * BLOCK_SIZE + threadIdx.x;
+		int r = m * BLOCK_SIZE + threadIdx.y;
+
+		A_s[threadIdx.y][threadIdx.x] = A[IDX(row, c, P)];
+		B_s[threadIdx.y][threadIdx.x] = B[IDX(r, col, M)];
+
+		// ******************* BARRIER SYNC ************************
+		__syncthreads();
+
+		// length of this part of row-column product is BLOCK_SIZE
+		// except for last block when it may be smaller
+		int K = (m == numBlocks - 1 ? P - m * BLOCK_SIZE : BLOCK_SIZE);
+
+		// compute this part of row-column product
+		for (int k = 0; k < K; k++) {
+			sum += A_s[threadIdx.y][k] * B_s[k][threadIdx.x];
+		}
+
+		// ******************* BARRIER SYNC ************************
+		__syncthreads();
+	}
+
+	// all done; store computed element in matrix c
+	if (row < N && col < M)
+		C[row * M + col] = sum;
+}
 
 
 void read_data_file(Matrix* matrix, int n_matrix, int n_lines){
@@ -183,6 +251,15 @@ void read_data_file(Matrix* matrix, int n_matrix, int n_lines){
 	}
 }
 
+
+
+void between_scatter_matrix(){
+
+
+}
+void within_scatter_matrix(){
+
+}
 /*
 	Standard.
 	prefix h_ stand for host memory variable
@@ -191,6 +268,9 @@ void read_data_file(Matrix* matrix, int n_matrix, int n_lines){
 */
 int main(void){
 
+	/********************************************
+			Inizializzazione variabili
+	*********************************************/
 	cublasHandle_t handle;
 	cublasCreate(&handle);
 	int version;
@@ -214,6 +294,7 @@ int main(void){
 		cudaMallocHost((void**)&matrix[i].mean, 1*n_feature*sizeof(float));
 	}
 
+	// Leggi il dataser dai file
 	read_data_file(matrix, n_matrix, n_lines);
 
 
@@ -222,7 +303,6 @@ int main(void){
 	d_data = (float**)malloc(n_matrix*sizeof(float*)); 
 	d_means = (float**)malloc(n_matrix*sizeof(float*)); 
 
-	//Inizializzazione
 	for(i=0;i<n_matrix;i++){
 		cudaMalloc((void**)&d_data[i], n_lines*n_feature*sizeof(float));
 		cudaMalloc((void**)&d_means[i], 1*n_feature*sizeof(float));
@@ -234,8 +314,12 @@ int main(void){
 		cudaStreamCreate(&streams[i]);
 	}
 
-	dim3 threadPerBlock(n_feature,1);
-	dim3 blocksPerGrid(1, 1);
+	//dim3 threadPerBlock(n_feature,1);
+	//dim3 blocksPerGrid(1, 1);
+
+	dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE);
+	dim3 gridDim((M + blockDim.x - 1) / blockDim.x,
+			(N + blockDim.y - 1) / blockDim.y);
 
 	float ms;
 	cudaEvent_t startEvent, stopEvent;
@@ -282,14 +366,9 @@ int main(void){
 	print_matrix(t_mean, 1, n_feature, "Media totale");
 	
 
-	/************************************
-	Calcolo di Sb (Between class Matrix)
-	 per ogni classe calcolare:
-	
-	SB(i) = Ns .* (m_s - m)*(m_s - m)';
-	SB = SBi + SB(i+1)+ ... + SB(n-1)
-	
-	**************************************/
+	/**************************************
+		Calcolo between-scatter matrix
+	***************************************/
 	dim3 thread_block(1,n_feature);
 	dim3 blocks_grid(1, 1);
 
@@ -347,18 +426,11 @@ int main(void){
 	//TODO: liberare memoria delle operazioni di SB
 
 
-	/********************
-	variabile d_sb contiene Between-scatter matrix
-	********************/
 
 
-	/********************
-	Calcolo della Within-scatter matrix
-
-	((setosa - m_s'))'*((setosa - m_s')))./50
-	sw = n.*( c_s + c_vi + c_ve); Somma di covarianze
-
-	********************/
+	/*******************************************
+			Calcolo della Within-scatter matrix
+	********************************************/
 
 	//Calcolo covarianza
 	float** d_temp_sw;

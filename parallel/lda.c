@@ -212,12 +212,27 @@ int main(void){
 	}
 
 
+	/*************************************************************
+				Trasformazione dello spazio di partenza
+	**************************************************************/
+	 float* h_eigenvectors = (float*)malloc(m*(n_matrix-1)*sizeof(float));
+
+    // 4x4
+   	int rows = size_sw;
+   	int cols = size_sw;
+    for(int i=0; i<rows; i++){
+    	int h=0;
+    	for(int j=0; j<(n_matrix-1); j++){
+    		h_eigenvectors[i*(n_matrix-1)+h] = v[i*cols+j];
+    		h++;
+    	}    	
+    }
 
 
 	/*************************************************************
 				Plot dei risultati
 	**************************************************************/
-	plot(M, N_MATRIX, n_row, n_col,2,v[0][i_max],v[1][i_max]);
+	//plot(M, N_MATRIX, n_row, n_col,2,v[0][i_max],v[1][i_max]);
 	return 0;
 }
 
