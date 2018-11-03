@@ -38,6 +38,19 @@ Dopo aver ottenuto \(Sb\) e \(Sw\), vogliamo trovare l'equazione lineare che mas
 
 Si può dimostrare che la trasformazione W può essere ottenuta risolvendo un problema sugli autovalori:
 \[S_{b}W = \lambda S_{w}W\]
+
+\subsection{Parallelizzazione di LDA utilizzando CUDA}
+L'algoritmo LDA consiste in varie step mostrati in tabella 1.
+Operazioni su GPU.
+\begin{table}[]
+	\begin{tabular}{lllll}
+		& mi  &  & Calcolo media delle classi &  \\
+		& M &  & Calcolo media totale &  \\
+		&  & (x-xi) & Differenza tra vettori &  \\
+		&  & (x-xi)' &  Calcolo vettore trasposto & 
+	\end{tabular}
+\end{table}
+
  
 \section{Simulazione ed esperimenti}
 Sono stati sviluppati due algoritmi. Quello sequenziale e quello parallelo.

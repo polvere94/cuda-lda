@@ -5,7 +5,6 @@ Compile instruction
 @author: Francesco Polvere
 @email: francesco.polvere@studenti.unimi.it
 */
-
 #include <stdio.h>
 #include <stdlib.h> 
 #include <cuda.h>
@@ -62,7 +61,7 @@ __global__ void add_matrix(float* in_a, float* in_b, float* out,int n, int m) {
 /*
  * kernel: somma dei vettori
  */
-__global__ void add_vect(float* in_a, float* in_b, float* out, int v_size, int n_matrix) {
+__global__ void add_vectors(float* in_a, float* in_b, float* out, int v_size, int n_matrix) {
 	int idx = blockDim.x * blockIdx.x + threadIdx.x;
 	if (idx < v_size)
 		out[idx] = in_a[idx] + in_b[idx];
@@ -71,7 +70,7 @@ __global__ void add_vect(float* in_a, float* in_b, float* out, int v_size, int n
 /*
  * kernel: differenza dei vettori
  */
-__global__ void div_matr_scal(float* in_a, float scalar, float* out, int n, int m) {
+__global__ void div_by_scalar(float* in_a, float scalar, float* out, int n, int m) {
 	int idx = blockDim.x * blockIdx.x + threadIdx.x;
 	if (idx < n*m)
 		out[idx] = in_a[idx] / scalar;
@@ -94,7 +93,6 @@ __global__ void diff_matr_vect( float* in_matr, float* in_vect, float* out_matr,
 		out_matr[idx] = in_matr[idx] - in_vect[idx%m];
 }
 
-#define IDX(i,j,n) (i*n+j)
 // n e m dimensione matrice output
 __global__ void matrix_prod(float* in_a, float* in_b, float* out, int n, int m,int p){
 	int row = blockIdx.y * blockDim.y + threadIdx.y;
@@ -155,19 +153,6 @@ __global__ void matrix_mean(float* in, float* out, int in_row, int in_col){
 				 in_col  numero colonne della matrice di input (=colonne matrice output)
 
 */
-__global__ void between_scatter_matrix(float* in, float* out, int in_row, int in_col){
-	int col = blockIdx.x * blockDim.x + threadIdx.x;
-	int i = 0;
-	float val = 0;
-	if((col < in_col)){
-		val = 0;
-		for(i=0; i<in_row; i++){
-			val += in[i * in_col + col];
-		}
-		out[col] = val/in_row;
-	}
-
-}
 
 
 
@@ -183,47 +168,7 @@ __global__ void transposeNaiveRow(float* in, float* out, int ny, int nx) {
 }
 
 
-__global__ void mat_prod_shared(float* A, float* B, float* C) {
-	// indexes
-	int row = blockIdx.y * blockDim.y + threadIdx.y;
-	int col = blockIdx.x * blockDim.x + threadIdx.x;
 
-	// block shared memory
-	__shared__ float A_s[BLOCK_SIZE][BLOCK_SIZE];
-	__shared__ float B_s[BLOCK_SIZE][BLOCK_SIZE];
-
-	// loop over blocks from block row of matrix A and block column of matrix B
-	float sum = 0.0;
-	int numBlocks = (P + BLOCK_SIZE - 1) / BLOCK_SIZE;
-	for (int m = 0; m < numBlocks; m++) {
-
-		// copy block from matrix to shared memory
-		int c = m * BLOCK_SIZE + threadIdx.x;
-		int r = m * BLOCK_SIZE + threadIdx.y;
-
-		A_s[threadIdx.y][threadIdx.x] = A[IDX(row, c, P)];
-		B_s[threadIdx.y][threadIdx.x] = B[IDX(r, col, M)];
-
-		// ******************* BARRIER SYNC ************************
-		__syncthreads();
-
-		// length of this part of row-column product is BLOCK_SIZE
-		// except for last block when it may be smaller
-		int K = (m == numBlocks - 1 ? P - m * BLOCK_SIZE : BLOCK_SIZE);
-
-		// compute this part of row-column product
-		for (int k = 0; k < K; k++) {
-			sum += A_s[threadIdx.y][k] * B_s[k][threadIdx.x];
-		}
-
-		// ******************* BARRIER SYNC ************************
-		__syncthreads();
-	}
-
-	// all done; store computed element in matrix c
-	if (row < N && col < M)
-		C[row * M + col] = sum;
-}
 
 
 void read_data_file(Matrix* matrix, int n_matrix, int n_lines){
@@ -252,279 +197,256 @@ void read_data_file(Matrix* matrix, int n_matrix, int n_lines){
 }
 
 
+/**
+	Input: 
+		- int n_matrix,
+		- media globale
+		- medie locali
+		- numero colonne
+		- Gli passo un riferimento della device dove riprendere il risultato SB.
+	Output:
+		-d_sb. matrice quadrata, n_feature X n_feature.
 
-void between_scatter_matrix(){
+*/
+void between_scatter_matrix(int n_matrix, float** d_means, float* d_global_mean, int n_feature, float* d_sb){
+	int i;
+	float* d_sb_temp;
+	float* d_temp1;
+	dim3 thread_block2(n_feature*n_feature,1);
+	dim3 blocks_grid2(1, 1);
+	dim3 thread_block(1,n_feature);
+	dim3 blocks_grid(1, 1);
 
+	CHECK(cudaMemset(d_sb, 0, n_feature*n_feature*sizeof(float))); 
 
+	for(i=0; i<n_matrix; i++){
+		// Allocazione memoria device
+		CHECK(cudaMalloc((void**)&d_temp1, 1*n_feature*sizeof(float)));
+		CHECK(cudaMalloc((void**)&d_sb_temp, n_feature*n_feature*sizeof(float)));
+
+		//Fare differenza tra media locale e media globale (sono due vettori)
+		diff_vect<<<1, n_feature>>>(d_means[i], d_global_mean, d_temp1, n_feature, 1);
+
+		//Devo motliplicare le due matrici UNO x DUE
+		vector_prod<<<blocks_grid, thread_block>>>(d_temp1, d_temp1, d_sb_temp, n_feature, n_feature);
+		
+		add_matrix<<<blocks_grid2, thread_block2>>>(d_sb, d_sb_temp, d_sb, n_feature, n_feature);
+
+		CHECK(cudaFree(d_temp1));
+		CHECK(cudaFree(d_sb_temp));
+	}
+	
+	printf("Fine SB\n");
 }
-void within_scatter_matrix(){
 
+void within_scatter_matrix(int n_matrix,float** d_data, float** d_means,int n_lines, int n_feature,float* d_sw){
+	int i;
+	float* d_temp_sw;
+	float* d_temp_sw2;
+	float* d_temp_sw_t;	
+	dim3 bg(1,1);
+	dim3 th1(n_feature,n_lines);
+	dim3 th2(n_feature,n_feature);
+
+	for(i=0;i<n_matrix; i++){
+
+		CHECK(cudaMalloc((void**)&d_temp_sw, n_lines*n_feature*sizeof(float)));
+		CHECK(cudaMalloc((void**)&d_temp_sw2, n_feature*n_feature*sizeof(float)));
+		CHECK(cudaMalloc((void**)&d_temp_sw_t, n_feature*n_lines*sizeof(float)));
+
+		//Differenza tra la la matrice ed il vettore, riga per riga
+	
+		diff_matr_vect<<<1, n_lines*n_feature>>>(d_data[i], d_means[i], d_temp_sw, n_lines, n_feature);
+
+		transposeNaiveRow<<<bg,th1>>>(d_temp_sw, d_temp_sw_t, n_lines, n_feature);
+		
+		matrix_prod<<<bg,th2>>>(d_temp_sw_t, d_temp_sw, d_temp_sw2, n_feature, n_feature,n_lines);
+		
+		div_by_scalar<<<bg,n_feature*n_feature>>>(d_temp_sw2, n_lines-1, d_temp_sw2, n_feature, n_feature);
+		
+		add_matrix<<<1, n_feature*n_feature>>>(d_sw, d_temp_sw2, d_sw, n_feature, n_feature);
+
+		cudaFree(d_temp_sw);
+		cudaFree(d_temp_sw2);
+		cudaFree(d_temp_sw_t);
+	}
 }
+
+void new_projection(int n_matrix, float* h_v, int rows, int cols,Matrix* old_matrix, Matrix* new_matrix, int n_lines, int n_feature);
+
+
 /*
 	Standard.
 	prefix h_ stand for host memory variable
 		   d_ stand for device memory variable
 		   n_%	number of %
 */
-int main(void){
+int main(int argc, char *argv[]){
 
 	/********************************************
 			Inizializzazione variabili
 	*********************************************/
-	cublasHandle_t handle;
-	cublasCreate(&handle);
-	int version;
-	cublasGetVersion(handle, &version);
-	printf("\nUsing CUBLAS Version: %d\n", version);
-
-	//Fase 1) calcolo la media delle matrici
-	int i;
-
-
-	/* Lettura matrici dai file*/
-	Matrix* matrix;
-	const int n_matrix = 3;
-	const int n_lines = 50;
-	const int n_feature = 4;
-	
-	// Alloca memoria per ogni matrice
-	matrix = (Matrix*) malloc(n_matrix*sizeof(Matrix));
-	for(int i=0; i<n_matrix; i++){
-		cudaMallocHost((void**)&matrix[i].data, n_feature*n_lines*sizeof(float));
-		cudaMallocHost((void**)&matrix[i].mean, 1*n_feature*sizeof(float));
+	FILE* ftiming = fopen("stats/timing.csv", "a");
+	if (ftiming == NULL){
+    	printf("Errore apertura file per il timing\n");
+    	exit(1);
 	}
+	fprintf(ftiming, "\n");
 
-	// Leggi il dataser dai file
-	read_data_file(matrix, n_matrix, n_lines);
+	const int n_matrix = 3;
+	const int n_feature = 4;
+	int n_lines, i, version;
+	Matrix* matrix;
+	cublasHandle_t handle;
 
+	// Variabili per il timing
+	float ms;
+	cudaEvent_t startEvent, stopEvent;
 
 	float** d_data;
 	float** d_means;
+
+
+	if(argc!=2){
+		printf("Numero di parametri errato");
+		exit(-1);
+	}
+	n_lines = atoi(argv[1]);
+
+	//Informazioni su CUBLAS
+	cublasCreate(&handle);
+	cublasGetVersion(handle, &version);
+	printf("\nVersione CUBLAS: %d\n", version);
+
+	
+	/**************************************
+			calcolo la media delle matrici
+	**************************************/
+	// Alloca memoria pinned per ogni classe (matrice)
+	matrix = (Matrix*) malloc(n_matrix*sizeof(Matrix));
+
 	d_data = (float**)malloc(n_matrix*sizeof(float*)); 
 	d_means = (float**)malloc(n_matrix*sizeof(float*)); 
+	for(int i=0; i<n_matrix; i++){
+		//Allocazione memoria host
+		CHECK(cudaMallocHost((void**)&matrix[i].data, n_feature*n_lines*sizeof(float)));
+		CHECK(cudaMallocHost((void**)&matrix[i].mean, 1*n_feature*sizeof(float)));
 
-	for(i=0;i<n_matrix;i++){
-		cudaMalloc((void**)&d_data[i], n_lines*n_feature*sizeof(float));
-		cudaMalloc((void**)&d_means[i], 1*n_feature*sizeof(float));
+		//Allocazione memoria device
+		CHECK(cudaMalloc((void**)&d_data[i], n_lines*n_feature*sizeof(float)));
+		CHECK(cudaMalloc((void**)&d_means[i], 1*n_feature*sizeof(float)));
 	}
+
+	// Lettura dei file dove sono presenti i dati
+	read_data_file(matrix, n_matrix, n_lines);
+
 		
+	//Creazione degli stream per la sovrapposizione di operazioni I/O e GPU
 	int n_streams = n_matrix;
 	cudaStream_t streams[3];
 	for (i = 0; i < n_streams; ++i) {
-		cudaStreamCreate(&streams[i]);
+		CHECK(cudaStreamCreate(&streams[i]));
 	}
 
-	//dim3 threadPerBlock(n_feature,1);
-	//dim3 blocksPerGrid(1, 1);
+	dim3 threadPerBlock(n_feature,1);
+	dim3 blocksPerGrid(1, 1);
 
-	dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE);
-	dim3 gridDim((M + blockDim.x - 1) / blockDim.x,
-			(N + blockDim.y - 1) / blockDim.y);
-
-	float ms;
-	cudaEvent_t startEvent, stopEvent;
-	cudaEventCreate(&startEvent);
-	cudaEventCreate(&stopEvent);
-
-	cudaEventRecord(startEvent, 0);
+	
+	CHECK(cudaEventCreate(&startEvent));
+	CHECK(cudaEventCreate(&stopEvent));
+	CHECK(cudaEventRecord(startEvent, 0));
 	for (i = 0; i < n_streams; i++) {
-		cudaMemcpyAsync(d_data[i], matrix[i].data, n_lines*n_feature*sizeof(float), cudaMemcpyHostToDevice,streams[i]);
+		CHECK(cudaMemcpyAsync(d_data[i], matrix[i].data, n_lines*n_feature*sizeof(float), cudaMemcpyHostToDevice,streams[i]));
 		matrix_mean<<<threadPerBlock, threadPerBlock, 0, streams[i]>>>(d_data[i], d_means[i], n_lines, n_feature);
-		cudaMemcpyAsync(matrix[i].mean, d_means[i], 1*n_feature*sizeof(float), cudaMemcpyDeviceToHost, streams[i]);
+		CHECK(cudaMemcpyAsync(matrix[i].mean, d_means[i], 1*n_feature*sizeof(float), cudaMemcpyDeviceToHost, streams[i]));
 	}
-	cudaEventRecord(stopEvent, 0);
-	cudaEventSynchronize(stopEvent);
-	cudaEventElapsedTime(&ms, startEvent, stopEvent);
-	printf("Time for asynchronous V1 transfer and execute (ms): %f\n", ms);
-
-	for (int i = 0; i < n_streams; i++) {
-		cudaStreamSynchronize(streams[i]);
+	for (i = 0; i < n_streams; i++) {
+		CHECK(cudaStreamSynchronize(streams[i]));
 	}
-
+	CHECK(cudaEventRecord(stopEvent, 0));
+	CHECK(cudaEventSynchronize(stopEvent));
+	CHECK(cudaEventElapsedTime(&ms, startEvent, stopEvent));
+	fprintf(ftiming, "%f;",ms);
+	//CHECK(cudaDeviceSynchronize());
+	
+	
+	
 	//Calcolo media totale (somma dei vettori media)
 	
 	float* d_tmeans;
-	float* t_mean = (float*) malloc(1*n_feature*sizeof(float));
-	cudaMalloc((void**)&d_tmeans, 1*n_feature*sizeof(float));
-
-	cudaMemset(d_tmeans, 0, 1*n_feature*sizeof(float)); 	
+	//float* t_mean = (float*) malloc(1*n_feature*sizeof(float));
+	CHECK(cudaMalloc((void**)&d_tmeans, 1*n_feature*sizeof(float)));
+	CHECK(cudaMemset(d_tmeans, 0, 1*n_feature*sizeof(float))); 	
+	
 	for(int i=0;i<n_matrix;i++){
-		add_vect<<<1,n_feature>>>(d_tmeans, d_means[i], d_tmeans, 1*n_feature*sizeof(float), n_matrix);
+		add_vectors<<<1,n_feature>>>(d_tmeans, d_means[i], d_tmeans, n_feature*sizeof(float), n_matrix);
 	}
+	div_by_scalar<<<1,n_feature>>>(d_tmeans, n_matrix, d_tmeans, n_feature*sizeof(float),1);
 
-	cudaMemcpy(t_mean, d_tmeans, 1*n_feature*sizeof(float), cudaMemcpyDeviceToHost);
-	
-	cudaDeviceSynchronize();
-	//Divido per il numero di classi
-	for(int i=0; i<n_feature; i++){
-		t_mean[i]=t_mean[i] / n_matrix;
-	}
-
-	cudaMemcpy(d_tmeans, t_mean, 1*n_feature*sizeof(float), cudaMemcpyHostToDevice);
-	
-
-	print_matrix(t_mean, 1, n_feature, "Media totale");
-	
 
 	/**************************************
-		Calcolo between-scatter matrix
+			Calcolo between-scatter matrix
 	***************************************/
-	dim3 thread_block(1,n_feature);
-	dim3 blocks_grid(1, 1);
-
-
-	float* h_sb_temp = (float*) malloc(1*n_feature*sizeof(float));
-	float** d_temp1;
-	d_temp1 = (float**)malloc(n_matrix*sizeof(float*)); 
-
-	float** d_sb_temp;
-	d_sb_temp = (float**)malloc(n_matrix*sizeof(float*)); 
-	
-	//Inizializzazione
-	for(i=0;i<n_matrix;i++){
-		cudaMalloc((void**)&d_temp1[i], 1*n_feature*sizeof(float));
-		cudaMalloc((void**)&d_sb_temp[i], n_feature*n_feature*sizeof(float));
-	}
-
-	for(int i=0; i<n_matrix; i++){
-		//Fare differenza tra media locale e media globale (sono due vettori)
-		diff_vect<<<1, n_feature>>>(d_means[i], d_tmeans, d_temp1[i], n_feature, 1);
-		//Devo trasporre la matrice risultante.
-		vector_prod<<<blocks_grid, thread_block>>>(d_temp1[i], d_temp1[i], d_sb_temp[i], n_feature, n_feature);
-		//Devo motliplicare le due matrici UNO x DUE
-	}
-	cudaDeviceSynchronize();
-	cudaMemcpy(h_sb_temp, d_sb_temp[1], n_feature*n_feature*sizeof(float), cudaMemcpyDeviceToHost);
-	
-
-	//SOMMO TUTTE LE MATRICI USCENTI DALLE MOLTIPLICAZIONE ED OTTENGO SB
+	CHECK(cudaEventRecord(startEvent, 0));
 	float* d_sb;
-	float* h_sb = (float*)malloc(n_feature*n_feature*sizeof(float));
-	cudaMalloc((void**)&d_sb, n_feature*n_feature*sizeof(float));
-	cudaMemset(d_sb, 0, n_feature*n_feature*sizeof(float)); 
-
-	dim3 thread_block2(n_feature*n_feature,1);
-	dim3 blocks_grid2(1, 1);
-	for(int i=0; i<n_matrix; i++){
-		add_matrix<<<blocks_grid2, thread_block2>>>(d_sb, d_sb_temp[i], d_sb, n_feature, n_feature);
-	}
-
-	cudaDeviceSynchronize();
-
-	cudaMemcpy(h_sb, d_sb, n_feature*n_feature*sizeof(float), cudaMemcpyDeviceToHost);
+	CHECK(cudaMalloc((void**)&d_sb, n_feature*n_feature*sizeof(float)));
 	
-	for(int i = 0;i<n_matrix;i++){
-		cudaFree(&d_sb_temp[i]);
-	}
+	between_scatter_matrix(n_matrix, d_means, d_tmeans, n_feature,d_sb);
 
-	free(d_sb_temp);
-
-	
-	print_matrix(h_sb, n_feature, n_feature, "Between-scatter matrix");
-
-		
-	//TODO: liberare memoria delle operazioni di SB
-
-
-
+	CHECK(cudaDeviceSynchronize());
+	CHECK(cudaEventRecord(stopEvent, 0));
+	CHECK(cudaEventSynchronize(stopEvent));
+	CHECK(cudaEventElapsedTime(&ms, startEvent, stopEvent));
+	fprintf(ftiming, "%f;",ms);
 
 	/*******************************************
 			Calcolo della Within-scatter matrix
 	********************************************/
-
-	//Calcolo covarianza
-	float** d_temp_sw;
-	d_temp_sw = (float**)malloc(n_matrix*sizeof(float*));
-	for(i=0;i<n_matrix;i++)
-		cudaMalloc((void**)&d_temp_sw[i], n_lines*n_feature*sizeof(float));
-
-	//Differenza tra la la matrice ed il vettore, riga per riga
-	for(int i=0;i<n_matrix; i++){
-		diff_matr_vect<<<1, n_lines * n_feature>>>(d_data[i], d_means[i], d_temp_sw[i], n_lines, n_feature);
-	}
-	cudaDeviceSynchronize();
-
-	float** d_temp_sw2;
-	float** d_temp_sw_t;
-	d_temp_sw2 = (float**)malloc(n_matrix*sizeof(float*));
-	for(i=0;i<n_matrix;i++)
-		cudaMalloc((void**)&d_temp_sw2[i], n_feature*n_feature*sizeof(float));
-
-	d_temp_sw_t = (float**)malloc(n_matrix*sizeof(float*));
-	for(i=0; i<n_matrix; i++)
-		cudaMalloc((void**)&d_temp_sw_t[i], n_feature*n_lines*sizeof(float));
-
-	dim3 bg(1,1);
-	dim3 th1(n_feature,n_lines);
-	dim3 th2(n_feature,n_feature);
-	for(int i=0;i<n_matrix; i++){
-		transposeNaiveRow<<<bg,th1>>>(d_temp_sw[i], d_temp_sw_t[i], n_lines, n_feature);
-		matrix_prod<<<bg,th2>>>(d_temp_sw_t[i], d_temp_sw[i], d_temp_sw2[i], n_feature, n_feature,n_lines);
-		div_matr_scal<<<bg,n_feature*n_feature>>>(d_temp_sw2[i], n_lines-1, d_temp_sw2[i], n_feature, n_feature);
-	}
-	cudaDeviceSynchronize();
+	CHECK(cudaEventRecord(startEvent, 0));
 	
 	float* d_sw;
-	cudaMalloc((void**)&d_sw,n_feature*n_feature*sizeof(float));
-	cudaMemset(d_sw,0,n_feature*n_feature*sizeof(float));
+	CHECK(cudaMalloc((void**)&d_sw,n_feature*n_feature*sizeof(float)));
+	CHECK(cudaMemset(d_sw,0,n_feature*n_feature*sizeof(float)));
 	
-	for(int i=0; i<n_matrix; i++){
-		add_matrix<<<1, n_feature*n_feature>>>(d_sw, d_temp_sw2[i], d_sw, n_feature, n_feature);
-	}
-	cudaDeviceSynchronize();
-	float* h_sw = (float*)malloc(n_feature*n_feature*sizeof(float));
-	cudaMemcpy(h_sw, d_sw, n_feature*n_feature*sizeof(float), cudaMemcpyDeviceToHost);
+	within_scatter_matrix(n_matrix,d_data, d_means, n_lines, n_feature,d_sw);
 	
-
-	print_matrix(h_sw, n_feature, n_feature, "Whitin-scatter matrix");
-
-	/***********************
-		Ho trovato SW!!!
-		Ora devo calcolare la matrice inversa di SW e poi usare SVD per trovare gli autovalori e autovettori associati
-	************************/
-	
-   
-
-
-    float h_invsw[n_feature*n_feature];
-    float* a = h_sw;
-
-    /***********
-    Calcolo matrice inversa di SW
-    ***********/
-    invert(a, h_invsw,n_feature);
-
-    print_matrix(h_invsw,n_feature,n_feature,"Matrice inversa di SW");
-
+	CHECK(cudaEventRecord(stopEvent, 0));
+	CHECK(cudaEventSynchronize(stopEvent));
+	CHECK(cudaEventElapsedTime(&ms, startEvent, stopEvent));
+	fprintf(ftiming, "%f;",ms);
+    /********************************************
+    		Calcolo matrice inversa di SW
+    ********************************************/
 
     float* d_invsw;
+    CHECK(cudaMalloc((void**)&d_invsw,n_feature*n_feature*sizeof(float)));
+    invert_device(d_sw, d_invsw, n_feature);
+   
     float* d_invsw_by_sb;
     float* h_invsw_by_sb = (float*)malloc(n_feature*n_feature*sizeof(float));
-	cudaMalloc((void**)&d_invsw,n_feature*n_feature*sizeof(float));
-	cudaMalloc((void**)&d_invsw_by_sb,n_feature*n_feature*sizeof(float));
-	cudaMemcpy(d_invsw, h_invsw, n_feature*n_feature*sizeof(float), cudaMemcpyHostToDevice);
+	CHECK(cudaMalloc((void**)&d_invsw_by_sb,n_feature*n_feature*sizeof(float)));
+	//cudaMemcpy(d_invsw, h_invsw, n_feature*n_feature*sizeof(float), cudaMemcpyHostToDevice);
 	
 	dim3 th3(n_feature,n_feature);
     matrix_prod<<<1,th3>>>(d_invsw, d_sb, d_invsw_by_sb, n_feature, n_feature, n_feature);
-	cudaDeviceSynchronize();
+	CHECK(cudaDeviceSynchronize());
 
-    cudaMemcpy(h_invsw_by_sb, d_invsw_by_sb, n_feature*n_feature*sizeof(float), cudaMemcpyDeviceToHost);
+   	CHECK(cudaMemcpy(h_invsw_by_sb, d_invsw_by_sb, n_feature*n_feature*sizeof(float), cudaMemcpyDeviceToHost));
 	
 	
     print_matrix(h_invsw_by_sb, n_feature, n_feature, "inversa di SW per SB");
 
 
-
     /******************************************
 		Calcolo autovalori e autovettori
     **********************************************/
+    // Creazione hanlde cursolver
 	cusolverDnHandle_t cusolverH = NULL;
 	const int lda = n_feature;
 	const int m = n_feature;
-	double V[lda*m]; // eigenvectors
-    double W[m]; // eigenvalues
+	double V[lda*m]; //conterra gli autovettori
+    double W[m]; // conterra gli autovalori
 
-    //float A1[lda*m] = { 3.5, 0.5, 0, 0.5, 3.5, 0, 0, 0, 2.0};
     double A[lda*m];
 
     // Conversione di tipo, da float a double
@@ -534,34 +456,34 @@ int main(void){
     	}
     }
 
-    double *d_A = NULL;
-    double *d_W = NULL;
-    int *devInfo = NULL;
-    double *d_work = NULL;
-    int  lwork = 0;
+    double *d_A;
+    double *d_W;
+    int *devInfo;
+    double *d_work;
+    int lwork = 0;
 
-    // step 1: create cusolver/cublas handle
     cusolverDnCreate(&cusolverH);
 
-    cudaMalloc ((void**)&d_A, sizeof(double) * lda * m);
-    cudaMalloc ((void**)&d_W, sizeof(double) * m);
-    cudaMalloc ((void**)&devInfo, sizeof(int));
-	cudaMemcpy(d_A, A, sizeof(double) * lda * m, cudaMemcpyHostToDevice);
+    CHECK(cudaMalloc ((void**)&d_A, sizeof(double) * lda * m));
+    CHECK(cudaMalloc ((void**)&d_W, sizeof(double) * m));
+    CHECK(cudaMalloc ((void**)&devInfo, sizeof(int)));
+	CHECK(cudaMemcpy(d_A, A, sizeof(double) * lda * m, cudaMemcpyHostToDevice));
 
-    // step 3: query working space of syevd
-    cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR; // compute eigenvalues and eigenvectors.
+    // Tipologia operazione
+    cusolverEigMode_t jobz = CUSOLVER_EIG_MODE_VECTOR; 
     cublasFillMode_t uplo = CUBLAS_FILL_MODE_LOWER;
-    cusolverDnDsyevd_bufferSize(cusolverH,jobz,uplo, m, d_A,lda,d_W, &lwork);
+ 
+ 	// Sizing del buffer
+    cusolverDnDsyevd_bufferSize(cusolverH, jobz, uplo, m, d_A, lda, d_W, &lwork);
 
-    cudaMalloc((void**)&d_work, sizeof(double)*lwork);
+    CHECK(cudaMalloc((void**)&d_work, sizeof(double)*lwork));
 
-	// step 4: compute spectrum
+	// Computazione
     cusolverDnDsyevd(cusolverH, jobz, uplo, m, d_A, lda, d_W, d_work, lwork, devInfo);
-    cudaDeviceSynchronize();
-   
+    CHECK(cudaDeviceSynchronize());
 
-    cudaMemcpy(W, d_W, sizeof(double)*m, cudaMemcpyDeviceToHost);
-    cudaMemcpy(V, d_A, sizeof(double)*lda*m, cudaMemcpyDeviceToHost);
+    CHECK(cudaMemcpy(W, d_W, sizeof(double)*m, cudaMemcpyDeviceToHost));
+    CHECK(cudaMemcpy(V, d_A, sizeof(double)*lda*m, cudaMemcpyDeviceToHost));
    
 
     printf("\n\nAutovalori, ordine ascendente\n");
@@ -575,27 +497,59 @@ int main(void){
 
 
     // IMPORTANTE: il risultato è trasposto!  VET' * VAL * inv(VET')
-    float* h_v = (float*)malloc(m*lda*sizeof(float));
+    float* h_vectors = (float*)malloc(m*lda*sizeof(float));
 
-     printf("\n\nAutovettori \n");
-     printf("[");
+    printf("\n\nAutovettori \n");
+    printf("[");
     for(int i = 0 ; i < m ; i++){
     	for(int j=0; j<lda; j++){
-    		h_v[i*lda+j] = V[j*m+i];
-        	printf("%.04f ", h_v[i*lda+j]);
+    		h_vectors[i*lda+j] = V[j*m+i];
+        	printf("%.04f ", h_vectors[i*lda+j]);
     	}
         printf(";\n");
     }
     printf("]");
 
-    //print_matrix(V, lda, m, "Autovettori");
+    Matrix* new_matrix = (Matrix*) malloc(n_matrix*sizeof(Matrix));
+    for(int i=0; i<n_matrix; i++){
+		new_matrix[i].data = (float*)malloc(n_lines*(n_matrix-1)*sizeof(float));
+		new_matrix[i].mean = (float*)malloc(1*sizeof(float));
+	}
+	fclose(ftiming);
+	// Calcolo nuova proiezione
+    new_projection(n_matrix, h_vectors, m, lda,matrix,new_matrix,n_lines, n_feature);
+	//plot(new_matrix,n_matrix, n_lines, n_matrix-1);
 
-    //Devo moltiplicare i dati X gli n_matrix-1 autovettori non nulli (i maggiori)
-    float* h_eigenvectors = (float*)malloc(m*(n_matrix-1)*sizeof(float));
+    for(i=0;i<n_matrix;i++){
+    	free(new_matrix[i].data);
+    	free(new_matrix[i].data);
+    	free(matrix[i].mean);
+    	free(matrix[i].mean);
+    }
+    free(new_matrix);
+     free(matrix);
+	return 0;
+}
+
+void new_projection(int n_matrix, float* h_v, int rows, int cols, Matrix* old_matrix, Matrix* new_matrix, int n_lines, int n_feature){
+	//Devo moltiplicare i dati X gli n_matrix-1 autovettori non nulli (i maggiori)
+	int i;
+	float* d_eigv;
+	float** d_new_data;
+    float* h_eigenvectors;
+	dim3 thh(n_matrix-1,n_lines);
+
+	// allocazione memoria host
+    h_eigenvectors = (float*)malloc(rows*(n_matrix-1)*sizeof(float));
+	d_new_data = (float**)malloc(n_matrix*sizeof(float*));
+
+	// allocazione memoria device
+    CHECK(cudaMalloc((void**)&d_eigv,rows*(n_matrix-1)*sizeof(float)));
+    for(i=0; i<n_matrix; i++)
+		CHECK(cudaMalloc((void**)&d_new_data[i], n_lines*(n_matrix-1)*sizeof(float)));
 
     // 4x4
-   	int rows = m;
-   	int cols = lda;
+    // prende solo gli n_matrix-1 autovettori (con autovalore maggiore)
     for(int i=0; i<rows; i++){
     	int h=0;
     	for(int j=0; j<2; j++){
@@ -605,56 +559,35 @@ int main(void){
     }
 
     print_matrix(h_eigenvectors,rows,n_matrix-1,"Autovavettori considerati");
-    float* d_eigv;
+  
+    CHECK(cudaMemcpy(d_eigv,h_eigenvectors,rows*(n_matrix-1)*sizeof(float),cudaMemcpyHostToDevice));
 
-    cudaMalloc((void**)&d_eigv,rows*(n_matrix-1)*sizeof(float));
-    cudaMemcpy(d_eigv,h_eigenvectors,rows*(n_matrix-1)*sizeof(float),cudaMemcpyHostToDevice);
-
-	Matrix* new_matrix = (Matrix*) malloc(n_matrix*sizeof(Matrix));
-	for(int i=0; i<n_matrix; i++){
-		new_matrix[i].data = (float*)malloc(n_lines*(n_matrix-1)*sizeof(float));
-		new_matrix[i].mean = (float*)malloc( 1*(n_matrix-1)*sizeof(float));
-	}
-    float** d_new_data = (float**)malloc(n_matrix*sizeof(float*));
-	for(i=0; i<n_matrix; i++)
-		cudaMalloc((void**)&d_new_data[i], n_lines*(n_matrix-1)*sizeof(float));
-
-	dim3 thh(n_matrix-1,n_lines);
+	//TODO mettere stream
 	for(int i=0;i<n_matrix; i++){
-		matrix_prod<<<1,thh>>>(matrix[i].data, d_eigv, d_new_data[i], n_lines, n_matrix-1, n_feature);
+		matrix_prod<<<1,thh>>>(old_matrix[i].data, d_eigv, d_new_data[i], n_lines, n_matrix-1, n_feature);
 	}
-	cudaDeviceSynchronize();
+
+	CHECK(cudaDeviceSynchronize());
 
 	for(int i=0; i<n_matrix; i++){
-		//print_matrix(matrix[i].data,n_lines,n_matrix-1,"Vecchia matrice");
-		cudaMemcpy(new_matrix[i].data,d_new_data[i],n_lines*(n_matrix-1)*sizeof(float),cudaMemcpyDeviceToHost);
-		print_matrix(new_matrix[i].data,n_lines,n_matrix-1,"Nuova matrice");
+		CHECK(cudaMemcpy(new_matrix[i].data, d_new_data[i], n_lines*(n_matrix-1)*sizeof(float) ,cudaMemcpyDeviceToHost));
+		//print_matrix(new_matrix[i].data, n_lines, n_matrix-1, "Nuova matrice");
 	}
-
-	 plot(matrix,n_matrix, 4, 2);
-
-
-	// plot(new_matrix,n_matrix, n_lines, n_matrix-1);
-
-	 //, V[3], V[3*m]
-    plot(new_matrix,n_matrix, n_lines, n_matrix-1);
-
-
-	return 0;
 }
 
 void invert(float* src, float* dst, int n){
     float* src_d, *dst_d;
 
-    cudaMalloc<float>(&src_d,n * n * sizeof(float));
-    cudaMemcpy(src_d,src, n * n * sizeof(float),cudaMemcpyHostToDevice);
-    cudaMalloc<float>(&dst_d,n * n * sizeof(float));
+    CHECK(cudaMalloc<float>(&src_d,n * n * sizeof(float)));
+    CHECK(cudaMemcpy(src_d,src, n * n * sizeof(float),cudaMemcpyHostToDevice));
+    CHECK(cudaMalloc<float>(&dst_d,n * n * sizeof(float)));
 
     invert_device(src_d,dst_d,n);
 
-    cudaMemcpy(dst,dst_d,n * n * sizeof(float),cudaMemcpyDeviceToHost);
+    CHECK(cudaMemcpy(dst,dst_d,n * n * sizeof(float),cudaMemcpyDeviceToHost));
 
-    cudaFree(src_d), cudaFree(dst_d);
+    CHECK(cudaFree(src_d));
+    CHECK(cudaFree(dst_d));
 }
 
 void invert_device(float* src_d, float* dst_d, int n){
@@ -665,45 +598,47 @@ void invert_device(float* src_d, float* dst_d, int n){
 
     int *P, *INFO;
 
-    cudaMalloc<int>(&P, n * batchSize * sizeof(int));
-    cudaMalloc<int>(&INFO,batchSize * sizeof(int));
+    CHECK(cudaMalloc<int>(&P, n * batchSize * sizeof(int)));
+    CHECK(cudaMalloc<int>(&INFO,batchSize * sizeof(int)));
 
     int lda = n;
 
     float *A[] = { src_d };
     float** A_d;
-    cudaMalloc<float*>(&A_d,sizeof(A));
-    cudaMemcpy(A_d,A,sizeof(A),cudaMemcpyHostToDevice);
+    CHECK(cudaMalloc<float*>(&A_d,sizeof(A)));
+    CHECK(cudaMemcpy(A_d,A,sizeof(A),cudaMemcpyHostToDevice));
 
     cublasSgetrfBatched(handle,n,A_d,lda,P,INFO,batchSize);
 
     int INFOh = 0;
-    cudaMemcpy(&INFOh,INFO,sizeof(int),cudaMemcpyDeviceToHost);
+    CHECK(cudaMemcpy(&INFOh,INFO,sizeof(int),cudaMemcpyDeviceToHost));
 
     if(INFOh != 0)
     {
         fprintf(stderr, "Factorization Failed: Matrix is singular\n");
-        cudaDeviceReset();
+        CHECK(cudaDeviceReset());
         exit(EXIT_FAILURE);
     }
 
     float* C[] = { dst_d };
     float** C_d;
-    cudaMalloc<float*>(&C_d,sizeof(C));
-    cudaMemcpy(C_d,C,sizeof(C),cudaMemcpyHostToDevice);
+    CHECK(cudaMalloc<float*>(&C_d,sizeof(C)));
+    CHECK(cudaMemcpy(C_d,C,sizeof(C),cudaMemcpyHostToDevice));
 
     cublasSgetriBatched(handle,n,(const float **)A_d,lda,P,C_d,n,INFO,batchSize);
 
-    cudaMemcpy(&INFOh,INFO,sizeof(int),cudaMemcpyDeviceToHost);
+    CHECK(cudaMemcpy(&INFOh,INFO,sizeof(int),cudaMemcpyDeviceToHost));
 
     if(INFOh != 0)
     {
         fprintf(stderr, "Inversion Failed: Matrix is singular\n");
-        cudaDeviceReset();
+        CHECK(cudaDeviceReset());
         exit(EXIT_FAILURE);
     }
 
-    cudaFree(P), cudaFree(INFO), cublasDestroy_v2(handle);
+    CHECK(cudaFree(P));
+    CHECK(cudaFree(INFO));
+    cublasDestroy_v2(handle);
 }
 
 void plot(Matrix* matrix, int n_matrix, int n_row, int n_col){
@@ -724,18 +659,6 @@ void plot(Matrix* matrix, int n_matrix, int n_row, int n_col){
 			fprintf(temp, "%d \n",h);
 		}
 	}
-/*
-	FILE * temp_line = fopen("data/line.temp", "w");
-
-	for(int i=-10;i<=25;i++){
-
-		fprintf(temp_line, "%lf ", point_x*i);
-		fprintf(temp_line, "%lf ", point_y*i);
-		fprintf(temp_line,"\n");
-	}
-	 
-			*/
-
 	for (i=0; i < NUM_COMMANDS; i++){
 		fprintf(gnuplotPipe, "%s \n", commandsForGnuplot[i]);
 	}

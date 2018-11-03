@@ -1,4 +1,5 @@
 #include "matrix_op.h"
+
 typedef struct Matrix_{
     float* data;
     float* mean;

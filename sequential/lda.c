@@ -6,7 +6,7 @@ Compile instruction
 @email: francesco.polvere@studenti.unimi.it
 */
 #include <stdio.h>
-#include <stdlib.h> 
+#include <stdlib.h>
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
