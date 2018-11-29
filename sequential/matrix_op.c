@@ -1,64 +1,62 @@
 #include "matrix_op.h"
+#include "lib/svd.c"
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
 
-typedef struct Matrix_{
-    float* data;
-    float* mean;
-} Matrix;
+float* inv_matrix(float* IN, int matsize){
+	int i,j,k;
+	float **A, **I, *OUT,temp;
 
-/* Metodo della matrice dei cofattori
-Calcolo dei cofattori della matrice */
-float** cofactor(float** matrix,int size){
-	float **matrix_cofactor = (float**)malloc(size*sizeof(float *));
-	for (int j = 0; j < size; j++)
-			matrix_cofactor[j] = (float *) calloc(size, sizeof(float));
+	A=(float **)malloc(matsize*sizeof(float *));            
+    for(i=0;i<matsize;i++){
+        A[i]=(float *)malloc(matsize*sizeof(float));
+    }
 
-	float **m_cofactor = (float**)malloc(size*sizeof(float *));
-	for (int j = 0; j < size; j++)
-		m_cofactor[j] = (float *) calloc(size, sizeof(float));
-     
-    int p,q,m,n,i,j;
-    for (q=0;q<size;q++){
-        for (p=0;p<size;p++){
-            m=0;
-            n=0;
-            for (i=0;i<size;i++){
-                for (j=0;j<size;j++){
-                    if (i != q && j != p){
-    	                m_cofactor[m][n]=matrix[i][j];
-                        if (n<(size-2)){
-        	                n++;
-                        }else{
-                            n=0;
-                            m++;
-                        }
-                     }
-                 }
-             }
-             matrix_cofactor[q][p]=pow(-1,q + p) * determinant(m_cofactor,size-1);
-         }
-     }
-     return transpose_cofactor(matrix,matrix_cofactor,size);
-}
+	I=(float **)malloc(matsize*sizeof(float *));            
+    for(i=0;i<matsize;i++)
+        I[i]=(float *)malloc(matsize*sizeof(float));
 
-/*Finding transpose of cofactor of matrix*/ 
-float** transpose_cofactor(float** matrix,float** matrix_cofactor,int size){
-	int i,j;
-    float d;
-	float **m_inverse = (float**)malloc(size*sizeof(float *));
-	for (int j = 0; j < size; j++)
-		m_inverse[j] = (float *) calloc(size, sizeof(float));
-   
- 
- 	 d=determinant(matrix,size);
-
-    for (i=0;i<size;i++){
-        for (j=0;j<size;j++){
-            m_inverse[i][j]=matrix_cofactor[j][i]/d;
+    OUT=(float* )malloc(matsize*matsize*sizeof(float));            
+    
+    for(i=0;i<matsize;i++){
+        for(j=0;j<matsize;j++){
+            A[i][j] = IN[i*matsize+j];
         }
     }
-   	return m_inverse;
-}
 
+	 for(i=0;i<matsize;i++)                                  
+        for(j=0;j<matsize;j++)                              
+            if(i==j)                                        
+                I[i][j]=1;                                  
+            else                                           
+                I[i][j]=0;                                 
+    
+    for(k=0;k<matsize;k++) {
+    	temp=A[k][k];                  
+        for(j=0;j<matsize;j++){
+            A[k][j]/=temp;                                  
+            I[k][j]/=temp;                                  
+        }                                                   
+        for(i=0;i<matsize;i++){
+            temp=A[i][k];                       
+            for(j=0;j<matsize;j++){                                   
+                if(i==k)
+                    break;                      
+                A[i][j]-=A[k][j]*temp;         
+                I[i][j]-=I[k][j]*temp;         
+            }
+        }
+    }
+
+    for(i=0;i<matsize;i++){
+        for(j=0;j<matsize;j++){
+            OUT[i*matsize+j] = I[i][j];
+        }
+     }
+    return OUT;
+}
 
 float* init_matrix(int n_row, int n_col){
 	float *res;
@@ -74,97 +72,45 @@ float* init_matrix(int n_row, int n_col){
 void memset_matrix(float* a, int n_row,int n_col){
 	memset(a, 0, n_col*n_row*sizeof(float));
 }
-
-void free_matrix(float* a){
-	free(a);
-}
-
-
  
-/*Per il calcolo del determinante della matrice */
-float determinant(float **a,float size){
-	float **b = (float**)malloc(size*sizeof(float *));
-	for (int j = 0; j < size; j++)
-		b[j] = (float *) calloc(size, sizeof(float));
-
-	float s=1,det=0;
-	int i,j,m,n,c;
-	if (size==1){
-	    return (a[0][0]);
-	}else{
-	    det=0;
-	    for (c=0; c<size; c++){
-	    	m=0;
-	        n=0;
-	        for (i=0;i<size;i++){
-	            for (j=0; j<size; j++){
-	                b[i][j]=0;
-	                if (i != 0 && j != c){
-	                   	b[m][n]=a[i][j];
-	                   	if (n<(size-2))
-	                       n++;
-	                   	else{
-	                    	n=0;
-	                    	m++;
-	                    }
-	                }
-	            }
-	        }
-	        det=det + s * (a[0][c] * determinant(b,size-1));
-	        s=-1 * s;
-        }
-    }
-    return (det);
-}
-/*
-Calcola la media sulle colonne di una matrice
-*/
 void mean(float *M, int n_row, int n_col, float *means){
 	float sum;
 	for(int j = 0; j < n_col; j++){
 		sum = 0;
 		for(int i = 0; i < n_row; i++){
-			sum = sum + M[(i*n_col)+j];//M[i][j];
+			sum = sum + M[(i*n_col)+j];
 		}
 		means[j]=sum/n_row;
 	}
 }
-/*
-	Somma componenti delle matrici tra di loro [...]
-*/
-void sum_vectors(Matrix *M, int n_matrix, int n_col, float *C){
+
+void sum_vectors_mean(Matrix *M, int n_matrix, int n_col, float *C){
 	memset(C,0,n_col*sizeof(float));
 	for(int i = 0; i<n_matrix; i++){
 		for(int j=0; j<n_col; j++){
-			/*C[0][j] = C[0][j]*/ C[j]= C[j] + M[i].mean[j];
+			C[j]= C[j] + M[i].mean[j];
 		}
 	}
 }
 
-//TODO da problemi, forse buffer overflow
 void sum_matrix(float *m1, float *m2, int n_row, int n_col){
 	for(int i = 0; i<n_row; i++){
 		for(int j=0; j<n_col; j++){
-			//m1[i][j] =  m1[i][j] + m2[i][j];
 			m1[(i*n_col)+j] = m1[(i*n_col)+j] + m2[(i*n_col)+j];
 		}
 	}
 }
 
 void diff_vector(float *vector, float *vector2, int n_col, float *C){
-	//memset(C[0],0,n_col*sizeof(float));
 	for(int j=0; j<n_col; j++){
 		C[j] = vector[j] - vector2[j];
 	}
 }
 
-//Differenza tra matrice e vettore di uguali colonne
-void diff_matrix_vector(float *vector, float *vector2,int n_row, int n_col, float *C){
-	//memset(C,0,n_col*sizeof(float));
+void diff_matrix_vector(float *matrix, float *vector2,int n_row, int n_col, float *C){
 	for(int i=0; i<n_row; i++){
 		for(int j=0; j<n_col; j++){
-			C[(i*n_col)+j] = vector[(i*n_col)+j] - vector2[j];
-			//C[i][j] = vector[i][j] - vector2[0][j];
+			C[(i*n_col)+j] = matrix[(i*n_col)+j] - vector2[j];
 		}
 	}
 }
@@ -188,26 +134,13 @@ void transpose(float* a,int n_row, int n_col, float* res){
     for(i=0; i<n_row; i++)
         for(j=0; j<n_col; j++) {
         	res[(j*n_row)+i] = a[(i*n_col)+j];
-        	//res[j][i] = a[i][j];
         }
-}
-
-void print_matrix(float* a, int row, int col){
-	printf("\n\n");
-	for(int i = 0; i<row; i++){
-		printf("|");
-		for(int j = 0; j<col; j++){
-			printf("%0.3f |", a[(i*col)+j]);
-		}
-		printf("\n");
-	}
-	printf("\n\n");
 }
 
 int find_max(float* vector, int size){
 	int max = 0,i;
 	int index = 0;
-	for(i=0;i<size;i++){
+	for(i=0; i<size; i++){
 		if(vector[i]>=max){
 			index=i;
 			max=vector[i];
@@ -239,39 +172,10 @@ float* from_double_to_linear(float** a, int n_row, int n_col){
 	return res;
 }
 
-
-float LDeterminant(float* a, int size){
-	int i;
-	float d;
-	float **temp;
-	temp = from_linear_to_double(a,size,size);
-	d = determinant(temp, size);
-	for(i=0;i<size;i++)
-		free(temp[i]);
-	free(temp);
-	return d;
-}
-
-float* LCofactor(float* a, int size){
-	int i;
-	float** temp;
-	temp = from_linear_to_double(a,size,size);
-	float** cof =  cofactor(temp,size);
-	float* res = from_double_to_linear(cof,size,size);
-	for(i=0;i<size;i++){
-		free(cof[i]);
-		free(temp[i]);
-	}
-	free(temp);
-	free(cof);
-	return res;
-}
-
 void Lsvd(float* a, int size, float* w, float* v){
 
 	float** temp_v = from_linear_to_double(v,size,size);
 	
-
 	float **temp_invsw_by_sb = from_linear_to_double(a,size,size);
 	dsvd(temp_invsw_by_sb, size, size, w, temp_v);
 	
@@ -279,4 +183,14 @@ void Lsvd(float* a, int size, float* w, float* v){
 	v = from_double_to_linear(temp_v,size,size);
 }
 
-
+void print_matrix(float* a, int n_row, int n_col){
+	printf("\n\n");
+	for(int i = 0; i<n_row; i++){
+		printf("|");
+		for(int j = 0; j<n_col; j++){
+			printf("%0.3f |", a[(i*n_col)+j]);
+		}
+		printf("\n");
+	}
+	printf("\n\n");
+}

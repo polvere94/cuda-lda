@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "ciao";
-for i in {10..50}
+for i in {50..1024}
 do
 	echo $i;
 	./a $i;
