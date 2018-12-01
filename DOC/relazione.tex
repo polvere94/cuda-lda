@@ -1,13 +1,14 @@
 % !TeX spellcheck = <none>
 \documentclass{article}
 \usepackage{graphicx}
+\usepackage{float}
 \usepackage[italian]{babel}
 \usepackage[latin1]{inputenc}
 \usepackage{lipsum}% http://ctan.org/pkg/lipsum
 \begin{document}
 	\title{Linear discriminant analisys con CUDA C}
 	\author{Francesco~Polvere
-		\thanks{F. Polvere, Corso di GPU computing,  A/A 2017-2018, Universit\'a degli studi di Milano,
+		\thanks{F. Polvere, Corso di GPU computing,  A/A 2017-2018, Università degli studi di Milano,
 			via Celoria 28, Milano, Italia \protect\\
 			% note need leading \protect in front of \\ to get a newline within \thanks as
 			% \\ is fragile and will error, could use \hfil\break instead.
@@ -16,17 +17,14 @@
 	\maketitle
 	\begin{abstract}
 		%\boldmath
-		In questo documento viene presentata una implementazione dell'algoritmo di linear discriminant analisys tramite l'utilizzo della GPU sulla piattaforma CUDA. 
-		L'implementazione parallela viene confrontata con l'implementazione classica in C, tramite la misura di tempo di esecuzione e colcolatone lo speed-up.
-	
+		In questo documento viene presentata una implementazione dell'algoritmo Linear Discriminant Analisys tramite l'utilizzo della GPU sulla piattaforma CUDA. 
+		L'implementazione parallela viene confrontata con una implementazione classica in C, tramite la misura di tempo di esecuzione ed il calcolo dello speed-up.
 	
 \end{abstract}
 \section{Introduzione}
 Da una analisi del metodo di LDA, si può notare la presenza di numerose operazioni su matrici che presentano un alto grado di parallelizzabilità.
-\section{Analisi dello stato dell'arte}
-\lipsum[1-1]
-\section{Modello teorico}
-LDA è un metodo utilizzato per trovare una combinazione lineare di features che caratterizzato o separano due o più classi di oggetti o eventi. Il combinazione risultante può essere utilizzata  come classificatore lineare o ancor prima della classificazione, come operazione di riduzione di dimensionalità.
+\section{Analisi del modello teorico}
+LDA è un metodo utilizzato per trovare una combinazione lineare di feature che caratterizzato o separano due o più classi di oggetti o eventi. La combinazione risultante può essere utilizzata  come classificatore lineare o ancor prima della classificazione, come operazione di riduzione di dimensionalità.
 \subsection{LDA Multiclasse}
 Supponiamo di avere \(n\) classi. La Within-scatter matrix è calcolata come:
 
@@ -57,7 +55,8 @@ Il numero di osservazioni è uguale per ogni classe.\\
 \end{itemize}
 
 \paragraph{Media della i-esima classe}
-Per ogni classe vengono eseguite una \textit{cudaMemcpyAsync} per portare i dati sulla global memory del device ed il kernel che calcola ne la media (figura \ref{fig:means}).\\
+Per ogni classe viene eseguita una copia dei dati dalla memoria host a quella device tramite l'utilizzo della funzione \textit{cudaMemcpyAsync}. Successivamente tramite il kernel  <nome\_kernel>  calcola la media della matrice.\\
+L'utilizzo di stream pari al numero di matrici da elaborare permette overlapping tra l'operazioni I/O bound e di computazione, e anche ovelapping tra computazioni nel caso di piccolo kernel come mostrato in figura \ref{fig:means}.\\
 I risultati sono mantenuti in global memory e non riportati in memoria host per ottimizzarne le prestazioni.\\
 \begin{figure}[h]
 	\includegraphics[width=\linewidth]{images/overlap_calcolo_media.PNG}
@@ -66,32 +65,75 @@ I risultati sono mantenuti in global memory e non riportati in memoria host per 
 \end{figure}
 
 \paragraph{Media totale}
-La media totale è calcolata con un kernel (...) che esegue la somma degli C-vettori risultati dal calcolo precedente e dividendo per uno scalare che è il numero di classi.\\
-Questi n-vettori avranno hanno dimensione
+La media totale è calcolata con il kernel <nome\_kernel> che esegue la somma degli C-vettori risultati dal calcolo precedente del kernel <nome\_kernel>  e dividendo per uno scalare pari al numero di classi.\\
+Questi n-vettori avranno avranno dimensione 1x128 che è pari al numero di feature.
+ 
 \paragraph{Between-scatter matrix}
-Il calcolo della Between-scatter matrix necessità di tre piccoli kernel.\\
-Il kernel \textit{diff\_vect} si occupa di calcolare la differenza tra due vettori di dimensione \textit{M}, nel caso specifico tra il vettore media locale i-esimo e media globale. Successivamente si utilizza il kernel \textit{vector\_prod} per il calcolo del prodotto tra il vettore in uscita dal kernel precedente e la sua trasposta. Il risultato è una matrice quadrata di dimensione \textit{M X M}.\\
-L'ultimo punto è la somma di tutte le C matrici in uscita dal kernel precedente.\\
-Tutte e tre le operazioni sono eseguite da tutte le classi in stream diversi per ogni classe per permettere un livello di esecuzione concorrente maggiore.
+Il calcolo della Between-scatter matrix necessita di tre kernel.\\
+Il kernel \textbf{\textit{diff\_vect}} si occupa di calcolare la differenza tra due vettori di dimensione \textit{M}, nel caso specifico tra il vettore media locale i-esimo e media globale. Successivamente si utilizza il kernel \textbf{\textit{vector\_prod}} per il calcolo del prodotto tra il vettore in uscita dal kernel precedente e la sua trasposta. Il risultato è una matrice quadrata di dimensione \textit{M X M}.\\
+L'ultimo punto è la somma di tutte le C matrici in uscita dal kernel precedente ed è eseguito dal kernel \textbf{\textit{add\_matrix}}.\\
+Per ogni classe viene eseguito il gruppo dei tre kernel sopra descritti in stream diversi per permettere un livello di esecuzione concorrente maggiore in caso di dimensione del dataset ridotto.
+
 \paragraph{Within-scatter matrix}
-Il calcolo della Within-scatter matrix
+Il calcolo della Within-scatter matrix si avvale di cinque kernel qui sotto descritti.\\
+\begin{itemize}
+	\item \textbf{\textit{diff\_matr\_vect}}: è il kernel che si occupa di sottrarre il vettore media della classe i-esima dalla i-esima matrice, riga per riga.
+	\item \textbf{\textit{transposeSmem}}: esegue la trasposizione della matrice in ingresso
+	\item \textbf{\textit{mat\_prod\_shared}} si occupa di eseguire il prodotto tra matrice i-esima trasposta e la stessa matrice non trasposta.
+	\item  \textbf{\textit{div\_by\_scalar}}: esegue la divisione della matrice in ingresso per uno scalare.
+	\item \textbf{\textit{add\_matrix}}: esegue la delle matrici risultati dalle operazioni precedenti delle C-classi
+\end{itemize}
+Essendo piccoli kernel, l'utilizzo di stream pari al numero di matrici mi ha permesso di ottenere un overlapping tra i kernel appartenenti a stream diversi come mostrato in figura \ref{fig:overlapprodotto}
+\begin{figure}
+	\centering
+	\includegraphics[width=0.7\linewidth]{images/overlap_prodotto}
+	\caption{overlapping computazionale}
+	\label{fig:overlapprodotto}
+\end{figure}
+
+
+\paragraph{Calcolo matrice inversa di SW}
+Per il calcolo della matrice inversa ho utilizzato le funzioni \textit{cublasSgetrfBatched()} e \textit{cublasSgetriBatched()} della libreria cuBLAS che eseguono la fattorizzazione LU. Successivamente al calcolo ho eseguito il prodotto tra la matrice inversa ottenuta e la matrice SB, tramite il kernel \textit{matrix\_prod}
+
+\paragraph{Calcolo autovalori e autovettori}
+Per il calcolo degli autovalori e degli autovettori la funzione \textit{cusolverDnDsyevd} della libreria cuSOLVER che esegue la Singular Value Decomposition per il calcolo degli autovettori e degli autovalori della matrice quadrata in ingresso \(Mat^{MxM}\)
+
+\paragraph{Calcolo dei nuovi dati}
+Una volta ottenuto autovettori e rispettivi autovalori al passo precedente, ho selezionato gli C-1 autovettori che hanno gli autovalori massimi.\\
+Ho quindi moltiplicato la matrice originale, e.g. nel caso di 4096 campioni \(Mat^{4094x128}\) per questi C-1 autovettori tramite il kernel \textit{(mat\_prod\_shared} ottenendo così la nuova proiezione. La nuova matrice avrà quindi dimensione \(Mat^{4096x(C-1)}\)\\
+Ho utilizzato un numero di stream pari al numeri di matrici e \textit{cudaMemcpyAsync} per sovrapporre la computazione del kernel che calcola il prodotto matriciale e la copia dei dati dalla device memory alla host memory per eseguire il plot a video.
+
+\paragraph{Plotting}
+Plotto le prime due componenti 
+
+
+
 \section{Simulazione ed esperimenti}
-Sono stati sviluppati due algoritmi. Quello sequenziale e quello parallelo.
+Ho sviluppato due algoritmi. Quello sequenziale e quello parallelo.
 \subsection{Dataset}
-Per il benchmark \'e stato utilizzato il dataset Iris, introdotto da Ronald Fisher. Il dataset consiste in tre classi, ognuna delle quali rappresenta una specie di pianta, con un numero di istanze di 50 per ogni classe, per un totale di 150 istanze.
-Le variabili considerate sono quattro e consistono nella lunghezza e larghezza del sepalo e del petalo.
-\section{Risultati ottenuti}
+Per il benchmark ho utilizzato un dataset generato con una distribuzione normale multivariata. Ogni classe è costituita da 128 feature per campione ed un totale di 4096 istanze per classe.\\
+In termini matematici, ogni classe è rappresentata da una matrice \(Mat^{4096 X 128}\).
+\subsection{Risultati ottenuti}
 Il software è stato eseguito su un computer con le seguenti caratteristiche:
 \begin{itemize}
 	\item GPU: NVIDIA GeForce 610M, compute capability  2.1, architettura FERMI (2.1) con 48 Cores/SM.
 	\item CPU: Intel(R) Core(TM) i7-3630QM CPU @ 2.40GHz, 2401 Mhz, 4 core, 8 processori logici
 \end{itemize}
 
-\paragraph{Grafici}
- 
+Ho eseguito il calcolo del tempo impiegato dall'algoritmo tenendo fissato il numero di classi e di feature ed variando il numero di campioni incrementandolo come potenza di due fino al raggiungere il valore massimo del dataset.\\
+Per ogni step, ho eseguito l'algoritmo dieci volte ed elaborato la media dei tempi misurati per cercare di minimizzare l'effetto di eventuali outlier.\\\\
+In figura \ref{fig:speedup} è mostrato il grafico dello speed-up della versione parallela rispetto all'implementazine classica. Come è possibile notare, minore è il carico, il numero di campione che l'algoritmo deve elaborare e minore è la differenza prestazionale tra le due versioni. All'aumentare dei campioni, a parità di numero di feature, aumenta lo speedup.
+\begin{figure}[H]
+	\includegraphics[width=\linewidth]{images/speedup.png}
+ 	\caption{Speed-up}
+ 	\label{fig:speedup}
+\end{figure}
 
+La figura \ref{fig:ratio} mostra i tempi impiegati dai due algoritmi dove la versione parallela è rappresentata da una quasi-retta orizzontale, mentre la versione sequenziale da una retta inclinata che mostra come aumentano i tempi di calcolo all'aumentare del numero di campioni. 
+\begin{figure}[H]
+	\includegraphics[width=\linewidth]{images/ratio.png}
+	\caption{tempi}
+	\label{fig:ratio}
+\end{figure}
 
-
-\section{Conclusioni}
-\lipsum[1-2]
 \end{document}

@@ -17,16 +17,8 @@ void read_data_file(Matrix* matrix, int n_matrix, int n_lines,int n_feature){
 
 	char* filenames[4];
 
-	/*for(int j=0;j<3;j++){
-		filenames[j] = "../commons/data/D_1_512.dat";
-	}*/
-/*	filenames[0] = "../commons/data/D_1.dat";
-	filenames[1] = "../commons/data/D_2.dat";
-	filenames[2] = "../commons/data/D_3.dat";
-	filenames[3] = "../commons/data/D_4.dat";
-*/
 	// 1 ha problemi
-	filenames[0] = "../commons/data/DATA_1_MT.dat";
+	filenames[0] = "../commons/data/DATA_4_MT.dat";
 	filenames[1] = "../commons/data/DATA_2_MT.dat";
 	filenames[2] = "../commons/data/DATA_3_MT.dat";
 	filenames[3] = "../commons/data/DATA_4_MT.dat";

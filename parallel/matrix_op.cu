@@ -28,11 +28,10 @@ void print_matrix(float* in, int n, int m, char* label){
 	printf("\n");
 }
 
-__global__ void add_matrix(float* in_a, float* in_b, float* out,int n, int m) {
-	
+__global__ void add_matrix(float* in_a, float* in_b, float* out,int n, int m) {	
 	int idx = blockDim.x * blockIdx.x + threadIdx.x;
 	if ((idx < n*m))
-		out[idx] = in_a[idx] + in_b[idx];
+		out[idx] = in_a[idx] + in_b[idx];	
 }
 
 __global__ void add_vectors(float* in_a, float* in_b, float* out, int v_size) {
@@ -41,19 +40,11 @@ __global__ void add_vectors(float* in_a, float* in_b, float* out, int v_size) {
 		out[idx] = in_a[idx] + in_b[idx];
 }
 
-void invert_device(float* src_d, float* dst_d, int n){
-    cublasHandle_t handle;
-    cublasCreate_v2(&handle);
-
-    int batchSize = 1;
-
-    int *P, *INFO;
-
+void invert_device(cublasHandle_t handle, float* src_d, float* dst_d, int n){
+    int batchSize = 1,*P, *INFO, lda = n, INFOh = 0;
 
     CHECK(cudaMalloc<int>(&P, n * batchSize * sizeof(int)));
     CHECK(cudaMalloc<int>(&INFO,batchSize * sizeof(int)));
-
-    int lda = n;
 
     float *A[] = { src_d };
     float** A_d;
@@ -62,11 +53,9 @@ void invert_device(float* src_d, float* dst_d, int n){
 
     cublasSgetrfBatched(handle,n,A_d,lda,P,INFO,batchSize);
 
-    int INFOh = 0;
     CHECK(cudaMemcpy(&INFOh,INFO,sizeof(int),cudaMemcpyDeviceToHost));
 
-    if(INFOh != 0)
-    {
+    if(INFOh != 0){
         fprintf(stderr, "Factorization Failed: Matrix is singular\n");
         CHECK(cudaDeviceReset());
         exit(EXIT_FAILURE);
