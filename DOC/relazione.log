@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.17 (MiKTeX 2.9.6210 64-bit) (preloaded format=pdflatex 2017.3.16)  1 DEC 2018 18:35
+This is pdfTeX, Version 3.14159265-2.6-1.40.17 (MiKTeX 2.9.6210 64-bit) (preloaded format=pdflatex 2017.3.16)  1 DEC 2018 18:39
 entering extended mode
 **./relazione.tex
 (relazione.tex
@@ -238,52 +238,59 @@ File: images/overlap_prodotto.png Graphic file (type png)
 Package pdftex.def Info: images/overlap_prodotto.png used on input line 89.
 (pdftex.def)             Requested size: 241.49895pt x 25.39644pt.
  [3 <./images/overlap_calcolo_media.PNG>]
-[4 <./images/overlap_prodotto.png>]
-<images/speedup.png, id=37, 1742.51pt x 898.35625pt>
+<images/plotting_data.png, id=33, 642.4pt x 385.44pt>
+File: images/plotting_data.png Graphic file (type png)
+
+<use images/plotting_data.png>
+Package pdftex.def Info: images/plotting_data.png used on input line 111.
+(pdftex.def)             Requested size: 241.49895pt x 144.8984pt.
+ [4 <./images/overlap_prodotto.png>]
+<images/speedup.png, id=38, 1742.51pt x 898.35625pt>
 File: images/speedup.png Graphic file (type png)
  <use images/speedup.png>
-Package pdftex.def Info: images/speedup.png used on input line 127.
+Package pdftex.def Info: images/speedup.png used on input line 133.
 (pdftex.def)             Requested size: 345.0pt x 177.85863pt.
 
-Underfull \hbox (badness 10000) in paragraph at lines 123--130
+Underfull \hbox (badness 10000) in paragraph at lines 129--136
 
  []
 
-<images/ratio.png, id=38, 1655.18375pt x 905.3825pt>
+[5 <./images/plotting_data.png>]
+<images/ratio.png, id=42, 1655.18375pt x 905.3825pt>
 File: images/ratio.png Graphic file (type png)
  <use images/ratio.png>
-Package pdftex.def Info: images/ratio.png used on input line 134.
+Package pdftex.def Info: images/ratio.png used on input line 140.
 (pdftex.def)             Requested size: 345.0pt x 188.71298pt.
 
-[5 <./images/speedup.png>] [6 <./images/ratio.png>] (relazione.aux) ) 
+[6 <./images/speedup.png> <./images/ratio.png>] (relazione.aux) ) 
 Here is how much of TeX's memory you used:
- 2631 strings out of 493333
- 35459 string characters out of 3139194
- 204455 words of memory out of 3000000
- 6127 multiletter control sequences out of 15000+200000
+ 2637 strings out of 493333
+ 35609 string characters out of 3139194
+ 204463 words of memory out of 3000000
+ 6132 multiletter control sequences out of 15000+200000
  9207 words of font info for 32 fonts, out of 3000000 for 9000
  1141 hyphenation exceptions out of 8191
  39i,11n,25p,805b,326s stack positions out of 5000i,500n,10000p,200000b,50000s
-<C:/Progra
-m Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmbx10.pfb><C:/Program Files/
-MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmbx12.pfb><C:/Program Files/MiKTeX 2
-.9/fonts/type1/public/amsfonts/cm/cmbx9.pfb><C:/Program Files/MiKTeX 2.9/fonts/
-type1/public/amsfonts/cm/cmbxti10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/
-public/amsfonts/cm/cmex10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/a
-msfonts/cm/cmmi10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/
-cm/cmmi7.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr10.
-pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr12.pfb><C:/P
-rogram Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr17.pfb><C:/Program Fi
-les/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr7.pfb><C:/Program Files/MiKTeX
- 2.9/fonts/type1/public/amsfonts/cm/cmr8.pfb><C:/Program Files/MiKTeX 2.9/fonts
-/type1/public/amsfonts/cm/cmr9.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/pub
-lic/amsfonts/cm/cmsy10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsf
-onts/cm/cmsy6.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/c
-msy7.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmsy8.pfb>
-<C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmti10.pfb>
-Output written on relazione.pdf (6 pages, 310684 bytes).
+<C:/Program Fi
+les/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmbx10.pfb><C:/Program Files/MiKT
+eX 2.9/fonts/type1/public/amsfonts/cm/cmbx12.pfb><C:/Program Files/MiKTeX 2.9/f
+onts/type1/public/amsfonts/cm/cmbx9.pfb><C:/Program Files/MiKTeX 2.9/fonts/type
+1/public/amsfonts/cm/cmbxti10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/publ
+ic/amsfonts/cm/cmex10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfo
+nts/cm/cmmi10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/c
+mmi7.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr10.pfb>
+<C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr12.pfb><C:/Progr
+am Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr17.pfb><C:/Program Files/
+MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr7.pfb><C:/Program Files/MiKTeX 2.9
+/fonts/type1/public/amsfonts/cm/cmr8.pfb><C:/Program Files/MiKTeX 2.9/fonts/typ
+e1/public/amsfonts/cm/cmr9.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/
+amsfonts/cm/cmsy10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts
+/cm/cmsy6.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmsy7
+.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmsy8.pfb><C:/
+Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmti10.pfb>
+Output written on relazione.pdf (6 pages, 318622 bytes).
 PDF statistics:
- 102 PDF objects out of 1000 (max. 8388607)
+ 103 PDF objects out of 1000 (max. 8388607)
  0 named destinations out of 1000 (max. 500000)
- 21 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 26 words of extra memory for PDF output out of 10000 (max. 10000000)
 
