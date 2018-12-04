@@ -51,7 +51,7 @@ int main(int argc, char *argv[]){
 	float** d_data, **d_means;
 	Matrix* matrix;
 
-	// Creazione hanlde cursolver
+	// Creazione hanlde cursolver e cublas
 	cusolverDnHandle_t cusolverH = NULL;
     cusolverDnCreate(&cusolverH);
     cublasHandle_t handle;
@@ -84,18 +84,18 @@ int main(int argc, char *argv[]){
 			calcolo la media delle matrici
 	**************************************/
 	// Alloca memoria pinned per ogni classe (matrice)
-	matrix = (Matrix*) malloc(n_matrix*sizeof(Matrix));
+	matrix = (Matrix*)malloc(n_matrix*sizeof(Matrix));
 
 	d_data = (float**)malloc(n_matrix*sizeof(float*)); 
 	d_means = (float**)malloc(n_matrix*sizeof(float*)); 
 	
 	for(i=0; i<n_matrix; i++){
 
-		//	allocazione memoria host
+		//	Allocazione memoria host
 		CHECK(cudaMallocHost((void**)&matrix[i].data, n_lines*n_feature*sizeof(float)));
 		CHECK(cudaMallocHost((void**)&matrix[i].mean, n_feature*sizeof(float)));
 
-		//	allocazione memoria device
+		//	Allocazione memoria device
 		CHECK(cudaMalloc((void**)&d_data[i], n_lines*n_feature*sizeof(float)));
 		CHECK(cudaMalloc((void**)&d_means[i], n_feature*sizeof(float)));
 	}
@@ -106,10 +106,6 @@ int main(int argc, char *argv[]){
 	//	print_matrix(matrix[2].data,n_lines,n_feature,"Matrice");	
 	
 	//Creazione degli stream per la sovrapposizione di operazioni I/O e GPU
-
-	 // Calculate the time taken by fun() 
-   /* clock_t t; 
-    t = clock();     */
 
 	//	creazione degli stream
 	int n_streams = n_matrix;
@@ -122,18 +118,16 @@ int main(int argc, char *argv[]){
 	dim3 blocksPerGrid(n_feature, 1);
 
 
-
 	for (i=0; i<n_streams; i++) {
 		CHECK(cudaMemcpyAsync(d_data[i], matrix[i].data, n_lines*n_feature*sizeof(float), cudaMemcpyHostToDevice,streams[i]));
 		matrix_mean<<<(n_feature+1)/BLOCK_SIZE_32, BLOCK_SIZE_32, 0, streams[i]>>>(d_data[i], d_means[i], n_lines, n_feature);
 		CHECK(cudaMemcpyAsync(matrix[i].mean, d_means[i], n_feature*sizeof(float), cudaMemcpyDeviceToHost, streams[i]));
 	}
+
 	for (i = 0; i < n_streams; i++) {
 		CHECK(cudaStreamSynchronize(streams[i]));
 	}
-	/*for(int u=0;u<n_matrix;u++)
-		print_matrix(matrix[u].mean,1,n_feature,"media");
-	*/
+
 
 	//fprintf(ftiming, "%f;",ms);
 
@@ -205,20 +199,17 @@ int main(int argc, char *argv[]){
     float* d_invsw_by_sb;
     float* h_invsw_by_sb = (float*)malloc(n_feature*n_feature*sizeof(float));
 	CHECK(cudaMalloc((void**)&d_invsw_by_sb,n_feature*n_feature*sizeof(float)));
-	//cudaMemcpy(d_invsw, h_invsw, n_feature*n_feature*sizeof(float), cudaMemcpyHostToDevice);
 	
+	//	prodotto tra  inversa di SW e SB
     matrix_prod<<<((n_feature*n_feature)+1)/BLOCK_SIZE,BLOCK_SIZE>>>(d_invsw, d_sb, d_invsw_by_sb, n_feature, n_feature, n_feature);
 	
-
-
    	CHECK(cudaMemcpy(h_invsw_by_sb, d_invsw_by_sb, n_feature*n_feature*sizeof(float), cudaMemcpyDeviceToHost));
 	
-	CHECK(cudaDeviceSynchronize());
     //print_matrix(h_invsw_by_sb, n_feature, n_feature, "inversa di SW per SB");
 
    
 
-    /******************************************
+    /*********************************************
 		Calcolo autovalori e autovettori
     **********************************************/
 	double V[n_feature*n_feature]; //	conterra gli autovettori
@@ -258,7 +249,7 @@ int main(int argc, char *argv[]){
     //print_matrix((float)W, 1, n_feature, "\n\nAutovalori, ordine ascendente\n");
 
 
-    // IMPORTANTE: il risultato è trasposto!  VET' * VAL * inv(VET')
+    // IMPORTANTE: il risultato è trasposto  VET' * VAL * inv(VET')
     float* h_vectors = (float*)malloc(n_feature*n_feature*sizeof(float));
 
     //printf("\n\nAutovettori \n");
@@ -279,26 +270,23 @@ int main(int argc, char *argv[]){
 		CHECK(cudaMallocHost((void**)&new_matrix[i].mean, 1*n_feature*sizeof(float)));
 	}
 
-	// Calcolo nuova proiezione
+	/********************************
+    		Calcolo nuova proiezione
+ 	*********************************/
     new_projection(h_vectors, n_feature, n_feature, n_matrix, matrix, new_matrix, n_lines, n_feature);
    
     
     /**********************
-    		timing
+    		Timing
  	***********************/
     cudaEventRecord(stop);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&et, start, stop);
-
-
-
-    //fprintf(ftiming, "tempo %lf\n", time_taken);
     printf("Tempo: %lf\n", et);
-	//fclose(ftiming);
 
-    
-
-    // Plotting dei risultati
+   	/*****************************
+    		Plot dei nuovi dati
+ 	******************************/
 	plot(new_matrix, n_matrix, n_lines, n_matrix-1, matrix, n_lines,n_feature);
 
 	// Free della memoria allocata
@@ -318,47 +306,41 @@ int main(int argc, char *argv[]){
 
 
 /*
-	TODO: il problema del crash è qui
+	Esegue il calcolo 
 */
 void new_projection(float* ev_v, int ev_rows, int ev_cols,int n_matrix, Matrix* old_matrix, Matrix* new_matrix, int n_lines, int n_feature){
 	//Devo moltiplicare i dati X gli n_matrix-1 autovettori non nulli (i maggiori)
-	
-	int n_streams = N_MATRIX, i, h, j;
+	int new_n_feature, new_matrix_cols;
+	int n_streams, i, h, j;
 	float *d_eigv, **d_new_data, *h_eigenvectors;
 	
-	int new_n_feature = n_matrix-1;
-	int new_matrix_cols = new_n_feature;
-	int new_matrix_rows = n_lines;
-	int old_matrix_cols = n_feature;
-	int old_matrix_rows = n_lines;
+	n_streams = N_MATRIX;
+	new_n_feature = n_matrix-1;
+	new_matrix_cols = new_n_feature;
 
 	
-	// allocazione memoria host
+	// Allocazione memoria host
     h_eigenvectors = (float*)malloc(ev_rows*new_matrix_cols*sizeof(float));
 	d_new_data = (float**)malloc(n_matrix*sizeof(float*));
 
-	// allocazione memoria device
-    CHECK(cudaMalloc((void**)&d_eigv, ev_rows*ev_cols*sizeof(float)));
+	// Allocazione memoria device
+    CHECK(cudaMalloc((void**)&d_eigv, ev_rows*new_matrix_cols*sizeof(float)));
     for(i=0; i<n_matrix; i++)
 		CHECK(cudaMalloc((void**)&d_new_data[i], n_lines*new_matrix_cols*sizeof(float)));
 
-    // prende solo gli n_matrix-1 autovettori (con autovalore maggiore)
+    // Prendo solo gli n_matrix-1 autovettori (con autovalore maggiore)
     for(i=0; i<ev_rows; i++){
     	h=0; 
-    	for(j=ev_cols-1; j>=ev_cols-3; j--){
+    	for(j=ev_cols-1; j>=(ev_cols-new_matrix_cols); j--){
     		h_eigenvectors[i*new_matrix_cols+h] = ev_v[i*ev_cols+j];
     		h++;
     	}
     }
-
    	//print_matrix(h_eigenvectors, ev_rows, n_matrix-1, "Autovavettori considerati");
   
     CHECK(cudaMemcpy(d_eigv, h_eigenvectors, ev_rows*new_matrix_cols*sizeof(float), cudaMemcpyHostToDevice));
 
-    CHECK(cudaDeviceSynchronize());
-
 	int rows_mat_a = n_lines;
-	//int cols_mat_a = n_feature;
 	int row_mat_b = ev_rows;
 	int cols_mat_b = new_matrix_cols;
 
@@ -370,14 +352,16 @@ void new_projection(float* ev_v, int ev_rows, int ev_cols,int n_matrix, Matrix* 
 		CHECK(cudaStreamCreate(&streams[i]));
 	}
 
-	//TODO verificare dimensioni matrici
+	
 	for(i=0; i<n_matrix; i++){
+		
+		//	Prodotto tra matrice dati e autovettori
 		mat_prod_shared<<<gridDim, blockDim, 0, streams[i]>>>(old_matrix[i].data, d_eigv, d_new_data[i], rows_mat_a, cols_mat_b, row_mat_b);
-		//matrix_prod<<<gridDim, blockDim, 0, streams[i]>>>(old_matrix[i].data, d_eigv, d_new_data[i],rows_mat_a, cols_mat_b, row_mat_b);
+		
 		CHECK(cudaMemcpyAsync(new_matrix[i].data, d_new_data[i], n_lines*new_matrix_cols*sizeof(float) ,cudaMemcpyDeviceToHost,streams[i]));
 	}
 
-	for (i = 0; i < n_streams; i++) {
+	for (i=0; i<n_streams; i++) {
 		CHECK(cudaStreamSynchronize(streams[i]));
 	}
 
@@ -405,8 +389,13 @@ void plot(Matrix* matrix, int n_matrix, int n_row, int n_col, Matrix* original_m
 
 	for(h=0; h<n_matrix; h++){
 		for(i=0; i<n_row;i++){
-			for(j=0;j<4;j=j+3){
-				fprintf(temp_1, "%lf ", matrix[h].data[i*n_col+j]); 
+			if((n_matrix-1)>1){
+				for(j=0;j<2;j=j++){
+					fprintf(temp_1, "%lf ", matrix[h].data[i*n_col+j]); 
+				}
+			}else{
+				fprintf(temp_1, "%lf ", matrix[h].data[i*n_col]); 
+				fprintf(temp_1,"0 "); 
 			}
 			fprintf(temp_1, "%d \n",h);
 		}
@@ -416,7 +405,7 @@ void plot(Matrix* matrix, int n_matrix, int n_row, int n_col, Matrix* original_m
 	FILE* temp_2 = fopen("data/data_2.temp", "w");
 	for(h=0; h<n_matrix; h++){
 		for(i=0; i<n_row;i++){
-			for(j=0;j<4;j=j+3){
+			for(j=0;j<2;j++){
 				fprintf(temp_2, "%lf ", original_matrix[h].data[i*or_n_col+j]); 
 			}
 			fprintf(temp_2, "%d \n",h);

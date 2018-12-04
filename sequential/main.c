@@ -14,8 +14,6 @@ Istruzione di compilazione
 #include "reader.c"
 #include "lda.h"
 
-#define FEATURE_NUMBER 128
-#define N_MATRIX 3
 
 int main(int argc, char *argv[]){
 

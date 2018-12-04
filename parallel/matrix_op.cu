@@ -166,15 +166,6 @@ __global__ void transposeSmem(float *in,float *out, int nrows, int ncols) {
 }
 
 
-__global__ void transposeNaiveRow(float* in, float* out, int ny, int nx) {
-	int ix = blockDim.x * blockIdx.x + threadIdx.x;
-	int iy = blockDim.y * blockIdx.y + threadIdx.y;
-
-	if ((ix < nx) && (iy < ny)) {
-		out[(ix*ny) + iy] = in[(iy*nx) + ix];
-	}
-}
-
 __global__ void matrix_mean(float* in, float* out, int in_row, int in_col){
 	int col = blockIdx.x * blockDim.x + threadIdx.x;
 	int i = 0;

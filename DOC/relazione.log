@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.17 (MiKTeX 2.9.6210 64-bit) (preloaded format=pdflatex 2017.3.16)  1 DEC 2018 18:39
+This is pdfTeX, Version 3.14159265-2.6-1.40.17 (MiKTeX 2.9.6210 64-bit) (preloaded format=pdflatex 2017.3.16)  4 DEC 2018 17:01
 entering extended mode
 **./relazione.tex
 (relazione.tex
@@ -98,7 +98,11 @@ File: latin1.def 2015/03/17 v1.2c Input encoding file
 ("C:\Program Files\MiKTeX 2.9\tex\latex\lipsum\lipsum.sty"
 Package: lipsum 2014/07/27 v1.3 150 paragraphs of Lorem Ipsum dummy text
 \c@lips@count=\count94
-) (relazione.aux)
+) (relazione.aux
+
+LaTeX Warning: Label `eq:3' multiply defined.
+
+)
 \openout1 = `relazione.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 8.
@@ -113,8 +117,7 @@ LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 8.
 LaTeX Font Info:    ... okay on input line 8.
 LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 8.
 LaTeX Font Info:    ... okay on input line 8.
-
-("C:\Program Files\MiKTeX 2.9\tex\context\base\supp-pdf.mkii"
+ ("C:\Program Files\MiKTeX 2.9\tex\context\base\supp-pdf.mkii"
 [Loading MPS to PDF converter (version 2006.09.02).]
 \scratchcounter=\count95
 \scratchdimen=\dimen106
@@ -200,97 +203,102 @@ LaTeX Font Info:    External font `cmex10' loaded for size
 LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <6> not available
 (Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 17.
 LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <7> on input line 29.
- [1
+(Font)              <7> on input line 27.
+
+Underfull \hbox (badness 10000) in paragraph at lines 31--34
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 36--39
+
+ []
+
+[1
 
 {C:/ProgramData/MiKTeX/2.9/pdftex/config/pdftex.map}]
-Underfull \hbox (badness 10000) in paragraph at lines 45--47
-
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 49--51
-
- []
-
 LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <10> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 52.
-<images/overlap_calcolo_media.PNG, id=20, 624.83438pt x 134.75343pt>
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 53.
+
+Underfull \hbox (badness 10000) in paragraph at lines 72--74
+
+ []
+
+[2] <images/overlap_calcolo_media.PNG, id=23, 624.83438pt x 134.75343pt>
 File: images/overlap_calcolo_media.PNG Graphic file (type png)
 
 <use images/overlap_calcolo_media.PNG>
-Package pdftex.def Info: images/overlap_calcolo_media.PNG used on input line 62
+Package pdftex.def Info: images/overlap_calcolo_media.PNG used on input line 81
 .
 (pdftex.def)             Requested size: 345.0pt x 74.40453pt.
-
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-[2]
-Underfull \hbox (badness 10000) in paragraph at lines 78--79
+ [3 <./images/overlap_calcolo_media.PNG>]
+Underfull \hbox (badness 10000) in paragraph at lines 98--99
 
  []
 
-<images/overlap_prodotto.png, id=27, 787.44188pt x 82.80937pt>
+<images/overlap_prodotto.png, id=32, 787.44188pt x 82.80937pt>
 File: images/overlap_prodotto.png Graphic file (type png)
 
 <use images/overlap_prodotto.png>
-Package pdftex.def Info: images/overlap_prodotto.png used on input line 89.
+Package pdftex.def Info: images/overlap_prodotto.png used on input line 109.
 (pdftex.def)             Requested size: 241.49895pt x 25.39644pt.
- [3 <./images/overlap_calcolo_media.PNG>]
-<images/plotting_data.png, id=33, 642.4pt x 385.44pt>
+ [4 <./images/overlap_prodotto.png>]
+<images/plotting_data.png, id=37, 642.4pt x 385.44pt>
 File: images/plotting_data.png Graphic file (type png)
 
 <use images/plotting_data.png>
-Package pdftex.def Info: images/plotting_data.png used on input line 111.
+Package pdftex.def Info: images/plotting_data.png used on input line 132.
 (pdftex.def)             Requested size: 241.49895pt x 144.8984pt.
- [4 <./images/overlap_prodotto.png>]
-<images/speedup.png, id=38, 1742.51pt x 898.35625pt>
+ [5 <./images/plotting_data.png>]
+<images/speedup.png, id=41, 1742.51pt x 898.35625pt>
 File: images/speedup.png Graphic file (type png)
  <use images/speedup.png>
-Package pdftex.def Info: images/speedup.png used on input line 133.
+Package pdftex.def Info: images/speedup.png used on input line 153.
 (pdftex.def)             Requested size: 345.0pt x 177.85863pt.
 
-Underfull \hbox (badness 10000) in paragraph at lines 129--136
+Underfull \hbox (badness 10000) in paragraph at lines 149--156
 
  []
 
-[5 <./images/plotting_data.png>]
 <images/ratio.png, id=42, 1655.18375pt x 905.3825pt>
 File: images/ratio.png Graphic file (type png)
  <use images/ratio.png>
-Package pdftex.def Info: images/ratio.png used on input line 140.
+Package pdftex.def Info: images/ratio.png used on input line 160.
 (pdftex.def)             Requested size: 345.0pt x 188.71298pt.
 
-[6 <./images/speedup.png> <./images/ratio.png>] (relazione.aux) ) 
+[6 <./images/speedup.png>] [7 <./images/ratio.png>] (relazione.aux)
+
+LaTeX Warning: There were multiply-defined labels.
+
+ ) 
 Here is how much of TeX's memory you used:
- 2637 strings out of 493333
- 35609 string characters out of 3139194
- 204463 words of memory out of 3000000
- 6132 multiletter control sequences out of 15000+200000
+ 2640 strings out of 493333
+ 35627 string characters out of 3139194
+ 204526 words of memory out of 3000000
+ 6135 multiletter control sequences out of 15000+200000
  9207 words of font info for 32 fonts, out of 3000000 for 9000
  1141 hyphenation exceptions out of 8191
  39i,11n,25p,805b,326s stack positions out of 5000i,500n,10000p,200000b,50000s
-<C:/Program Fi
-les/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmbx10.pfb><C:/Program Files/MiKT
-eX 2.9/fonts/type1/public/amsfonts/cm/cmbx12.pfb><C:/Program Files/MiKTeX 2.9/f
-onts/type1/public/amsfonts/cm/cmbx9.pfb><C:/Program Files/MiKTeX 2.9/fonts/type
-1/public/amsfonts/cm/cmbxti10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/publ
-ic/amsfonts/cm/cmex10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfo
-nts/cm/cmmi10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/c
-mmi7.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr10.pfb>
-<C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr12.pfb><C:/Progr
-am Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr17.pfb><C:/Program Files/
-MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr7.pfb><C:/Program Files/MiKTeX 2.9
-/fonts/type1/public/amsfonts/cm/cmr8.pfb><C:/Program Files/MiKTeX 2.9/fonts/typ
-e1/public/amsfonts/cm/cmr9.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/
-amsfonts/cm/cmsy10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts
-/cm/cmsy6.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmsy7
-.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmsy8.pfb><C:/
-Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmti10.pfb>
-Output written on relazione.pdf (6 pages, 318622 bytes).
+<C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmbx10.pfb><C:/Pr
+ogram Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmbx12.pfb><C:/Program Fi
+les/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmbx9.pfb><C:/Program Files/MiKTe
+X 2.9/fonts/type1/public/amsfonts/cm/cmbxti10.pfb><C:/Program Files/MiKTeX 2.9/
+fonts/type1/public/amsfonts/cm/cmex10.pfb><C:/Program Files/MiKTeX 2.9/fonts/ty
+pe1/public/amsfonts/cm/cmmi10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/publ
+ic/amsfonts/cm/cmmi7.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfon
+ts/cm/cmr10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr
+12.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr17.pfb><C
+:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr7.pfb><C:/Program 
+Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr8.pfb><C:/Program Files/MiKT
+eX 2.9/fonts/type1/public/amsfonts/cm/cmr9.pfb><C:/Program Files/MiKTeX 2.9/fon
+ts/type1/public/amsfonts/cm/cmsy10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1
+/public/amsfonts/cm/cmsy6.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/a
+msfonts/cm/cmsy7.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/c
+m/cmsy8.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmti10.
+pfb>
+Output written on relazione.pdf (7 pages, 320882 bytes).
 PDF statistics:
- 103 PDF objects out of 1000 (max. 8388607)
+ 108 PDF objects out of 1000 (max. 8388607)
  0 named destinations out of 1000 (max. 500000)
  26 words of extra memory for PDF output out of 10000 (max. 10000000)
 

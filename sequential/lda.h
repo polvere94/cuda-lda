@@ -1,5 +1,6 @@
 #include "matrix_op.h"
-
+#define N_MATRIX 3
+#define FEATURE_NUMBER 128
 /*
 	Effettua il calcolo della Beetween Scatter Matrix
 

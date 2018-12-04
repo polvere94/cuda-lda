@@ -25,7 +25,6 @@ void invert_device(cublasHandle_t handle, float* src_d, float* dst_d, int n);
 
 __global__ void add_vectors(float* in_a, float* in_b, float* out, int v_size, int n_matrix);
 __global__ void add_matrix(float* in_a, float* in_b, float* out,int n, int m);
-__global__ void transposeNaiveRow(float* in, float* out, int ny, int nx);
 
 /*
 	Calcola il vettore media di una matrice rispetto alle colonne

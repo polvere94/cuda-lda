@@ -1,7 +1,4 @@
 /*
-Compile instruction
--> gcc -Wall .\lda.c
-
 @author: Francesco Polvere
 @email: francesco.polvere@studenti.unimi.it
 */
@@ -12,8 +9,6 @@ Compile instruction
 #include <string.h>
 #include <stdio.h>
 
-#define FEATURE_NUMBER 128
-#define N_MATRIX 3
 
 float* between_scatter_matrix(Matrix* matrix, int n_matrix, int n_row, int n_col, float* mean){
 	float* accumulatore_sb, *SBc, *v_transpose, *res2;
@@ -100,8 +95,13 @@ void plot(Matrix* matrix, int n_matrix, int n_row, int n_col, Matrix* original_m
 
 	for(h=0; h<n_matrix; h++){
 		for(i=0; i<n_row;i++){
-			for(j=0;j<4;j=j+3){
-				fprintf(temp_1, "%lf ", matrix[h].data[i*n_col+j]); 
+			if((n_matrix-1)>1){
+				for(j=0;j<2;j++){
+					fprintf(temp_1, "%lf ", matrix[h].data[i*n_col+j]); 
+				}
+			}else{
+				fprintf(temp_1, "%lf ", matrix[h].data[i*n_col]); 
+				fprintf(temp_1,"0 "); 
 			}
 			fprintf(temp_1, "%d \n",h);
 		}
@@ -110,7 +110,7 @@ void plot(Matrix* matrix, int n_matrix, int n_row, int n_col, Matrix* original_m
 	FILE* temp_2 = fopen("data/data_2.temp", "w");
 	for(h=0; h<n_matrix; h++){
 		for(i=0; i<n_row;i++){
-			for(j=0;j<4;j=j+3){
+			for(j=0;j<2;j++){
 				fprintf(temp_2, "%lf ", original_matrix[h].data[i*or_n_col+j]); 
 			}
 			fprintf(temp_2, "%d \n",h);
@@ -120,5 +120,4 @@ void plot(Matrix* matrix, int n_matrix, int n_row, int n_col, Matrix* original_m
 	for (i=0; i < NUM_COMMANDS; i++){
 		fprintf(gnuplotPipe, "%s \n", commandsForGnuplot[i]);
 	}
-
 }
