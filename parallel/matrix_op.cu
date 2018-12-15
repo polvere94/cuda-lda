@@ -1,16 +1,10 @@
 /*
-@author: Francesco Polvere
-@email: francesco.polvere@studenti.unimi.it
+	File contenente le implementazioni dei prototipi prensenti nel file matrix_op.h file.
+	Spiegazioni del compito delle funzioni presenti nell'header file.
 */
 
+#include <stdio.h>
 #include "matrix_op.h"
-#define SHARED_BLOCK_SIZE 16
-#define INDEX(rows, cols, stride) (rows * stride + cols)
-
-typedef struct Matrix_{
-    float* data;
-    float* mean;
-} Matrix;
 
 
 void print_matrix(float* in, int n, int m, char* label){
@@ -56,7 +50,7 @@ void invert_device(cublasHandle_t handle, float* src_d, float* dst_d, int n){
     CHECK(cudaMemcpy(&INFOh,INFO,sizeof(int),cudaMemcpyDeviceToHost));
 
     if(INFOh != 0){
-        fprintf(stderr, "Factorization Failed: Matrix is singular\n");
+        fprintf(stderr, "Fattorizzazione fallita: la matrice è singolare\n");
         CHECK(cudaDeviceReset());
         exit(EXIT_FAILURE);
     }
@@ -72,7 +66,7 @@ void invert_device(cublasHandle_t handle, float* src_d, float* dst_d, int n){
 
     if(INFOh != 0)
     {
-        fprintf(stderr, "Inversion Failed: Matrix is singular\n");
+        fprintf(stderr, "Inversione fallita: la matrice è singolare\n");
         CHECK(cudaDeviceReset());
         exit(EXIT_FAILURE);
     }
@@ -81,7 +75,6 @@ void invert_device(cublasHandle_t handle, float* src_d, float* dst_d, int n){
     CHECK(cudaFree(INFO));
     cublasDestroy_v2(handle);
 }
-
 
 __global__ void mat_prod_shared(float* A, float* B, float* C,int N, int M,int P) {
 	// indexes
@@ -125,7 +118,6 @@ __global__ void mat_prod_shared(float* A, float* B, float* C,int N, int M,int P)
 		C[row * M + col] = sum;
 }
 
-
 __global__ void transposeSmem(float *in,float *out, int nrows, int ncols) {
 		// static shared memory
 	__shared__ float tile[SHARED_BLOCK_SIZE][SHARED_BLOCK_SIZE];
@@ -138,8 +130,9 @@ __global__ void transposeSmem(float *in,float *out, int nrows, int ncols) {
 	unsigned int offset = INDEX(row, col, ncols);
 
 	// trasferimento dati dalla global memory alla shared memory
-	if (row < nrows && col < ncols)
+	if (row < nrows && col < ncols){
 		tile[threadIdx.y][threadIdx.x] = in[offset];
+	}
 
 	// thread synchronization
 	__syncthreads();
@@ -161,8 +154,9 @@ __global__ void transposeSmem(float *in,float *out, int nrows, int ncols) {
 	unsigned int transposed_offset = INDEX(row, col, nrows);
 
 	// NOTA: controlli invertiti nelle dim riga colonna
-	if (row < ncols && col < nrows)
+	if (row < ncols && col < nrows){
 		out[transposed_offset] = tile[icol][irow]; // NOTE icol,irow not irow,icol
+	}
 }
 
 
@@ -215,7 +209,7 @@ __global__ void div_by_scalar(float* in_a, float scalar, float* out, int n, int 
 		out[idx] = in_a[idx] / scalar;
 }
 
-__global__ void diff_vect(float* in_a, float* in_b, float* out, int v_size, int n_matrix) {
+__global__ void diff_vect(float* in_a, float* in_b, float* out, int v_size) {
 	int idx = blockDim.x * blockIdx.x + threadIdx.x;
 	if (idx < v_size)
 		out[idx] = in_a[idx] - in_b[idx];

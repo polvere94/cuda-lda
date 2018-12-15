@@ -1,5 +1,4 @@
 #!/bin/bash
-echo "ciao";
 for i in {50..1024}
 do
 	echo $i;
