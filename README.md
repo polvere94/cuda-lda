@@ -1,5 +1,5 @@
-# Progetto GPU Computing
-Implementazione dell'algoritmo Linear Discriminant Analysis in CUDA C
+# Linear Discriminant Analysis in Cuda C
+Implementazione dell'algoritmo Linear Discriminant Analysis in CUDA C per il progetto del corso di GPU Computing dell'Università degli Studi di Milano
 ## Contenuto
 
 * [parallel] - Contiene l'algoritmo parallelo scritto codice C CUDA
