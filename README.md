@@ -1,4 +1,4 @@
-# Linear Discriminant Analysis with Cuda C
+# [EN] Linear Discriminant Analysis with Cuda C
 Implementation of the Linear Discriminant Analysis algorithm in CUDA C for the project of the GPU Computing course of the University of Milan
 ## Content
 * [parallel] - Contiene l'algoritmo parallelo scritto codice C CUDA
@@ -11,7 +11,7 @@ Implementation of the Linear Discriminant Analysis algorithm in CUDA C for the p
 * CUDA Toolkit 8.0
 * Gnuplot 5.2
 
-# Linear Discriminant Analysis in Cuda C
+# [IT] Linear Discriminant Analysis in Cuda C
 Implementazione dell'algoritmo Linear Discriminant Analysis in CUDA C per il progetto del corso di GPU Computing dell'Università degli Studi di Milano
 ## Contenuto
 
